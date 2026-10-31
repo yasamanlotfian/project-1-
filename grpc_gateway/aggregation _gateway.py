@@ -86,7 +86,7 @@ def get_aggregated_blogs():
 
     try:
         response = stub.GetAggregatedBlogs(
-            aggregation_pb2.Empty(),
+           aggregation_pb2.GetAggregatedBlogsRequest(),
             timeout=10,
         )
 
