@@ -23,6 +23,7 @@ app = FastAPI(
     version="1.0.0",
     docs_url=None,
     redoc_url=None,
+    openapi_url="/openapi.json",
 )
 
 
@@ -39,19 +40,35 @@ def to_dict(message):
     )
 
 
-def grpc_error(exc):
+def grpc_error(exc: grpc.RpcError):
+    if exc.code() == grpc.StatusCode.UNAVAILABLE:
+        status_code = 503
+    elif exc.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
+        status_code = 504
+    else:
+        status_code = 500
+
     raise HTTPException(
-        status_code=(
-            503
-            if exc.code() == grpc.StatusCode.UNAVAILABLE
-            else 500
-        ),
-        detail=exc.details() or "gRPC request failed",
-    )
+        status_code=status_code,
+        detail={
+            "grpc_code": exc.code().name if exc.code() else "UNKNOWN",
+            "message": exc.details() or "gRPC request failed",
+        },
+    ) from exc
+
+
+@app.get("/", include_in_schema=False)
+def home():
+    return {
+        "message": "File Service API is running",
+        "openapi": "/openapi.json",
+        "scalar": "/scalar",
+    }
 
 
 @app.post("/upload")
 async def upload_file(upload: UploadFile = File(...)):
+
     content = await upload.read()
 
     if not content:
@@ -68,7 +85,11 @@ async def upload_file(upload: UploadFile = File(...)):
             content=content,
         )
 
-        result = stub.UploadFile(request, timeout=30)
+        result = stub.UploadFile(
+            request,
+            timeout=30,
+        )
+
         return to_dict(result)
 
     except grpc.RpcError as exc:
@@ -76,11 +97,22 @@ async def upload_file(upload: UploadFile = File(...)):
 
     finally:
         channel.close()
+        await upload.close()
 
 
 @app.get("/scalar", include_in_schema=False)
-async def scalar_docs():
+def scalar_docs():
     return get_scalar_api_reference(
         openapi_url=app.openapi_url,
         title=app.title,
+    )
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        app,
+        host="127.0.0.1",
+        port=7006,
     )
