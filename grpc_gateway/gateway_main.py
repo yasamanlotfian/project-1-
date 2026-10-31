@@ -364,3 +364,13 @@ async def proxy(service: str, path: str, request: Request):
             status_code=502,
             detail=f"{service} Gateway request failed: {exc}",
         ) from exc
+
+    
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        app,
+        host="127.0.0.1",
+        port=7004,
+    )
