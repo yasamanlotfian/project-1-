@@ -40,12 +40,49 @@ class AggregationService(
     aggregation_pb2_grpc.AggregationServiceServicer
 ):
 
-    def GetAggregatedBlog(self, request, context):
-        blog_channel = None
-        user_channel = None
+    # تبدیل اطلاعات Blog به BlogData
+    def blog_to_data(self, blog):
+        return aggregation_pb2.BlogData(
+            id=blog.id,
+            title=blog.title,
+            slug=blog.slug,
+            description=blog.description,
+            content=blog.content,
+            user_id=blog.user_id,
+            file_id=blog.file_id,
+        )
+
+    # دریافت اطلاعات کاربر از User Service
+    def get_user(self, user_id):
+        user_channel = grpc.insecure_channel(USER_ADDRESS)
 
         try:
-            # دریافت اطلاعات Blog
+            user_stub = user_pb2_grpc.UserServiceStub(
+                user_channel
+            )
+
+            user = user_stub.GetUser(
+                user_pb2.UserRequest(
+                    user_id=user_id
+                ),
+                timeout=5,
+            )
+
+            return aggregation_pb2.UserData(
+                id=user.id,
+                username=user.username,
+                email=user.email,
+                role=user.role,
+            )
+
+        finally:
+            user_channel.close()
+
+    # دریافت یک بلاگ همراه اطلاعات کاربر
+    def GetAggregatedBlog(self, request, context):
+        blog_channel = None
+
+        try:
             blog_channel = grpc.insecure_channel(BLOG_ADDRESS)
 
             blog_stub = blog_pb2_grpc.BlogServiceStub(
@@ -62,37 +99,11 @@ class AggregationService(
             print("Blog ID:", blog.id)
             print("Blog User ID:", blog.user_id)
 
-            # دریافت اطلاعات User
-            user_channel = grpc.insecure_channel(USER_ADDRESS)
+            user = self.get_user(blog.user_id)
 
-            user_stub = user_pb2_grpc.UserServiceStub(
-                user_channel
-            )
-
-            user = user_stub.GetUser(
-                user_pb2.UserRequest(
-                    user_id=blog.user_id
-                ),
-                timeout=5,
-            )
-
-            # برگرداندن پاسخ تجمیع‌شده
             return aggregation_pb2.AggregatedBlogResponse(
-                blog=aggregation_pb2.BlogData(
-                    id=blog.id,
-                    title=blog.title,
-                    slug=blog.slug,
-                    description=blog.description,
-                    content=blog.content,
-                    user_id=blog.user_id,
-                    file_id=blog.file_id,
-                ),
-                user=aggregation_pb2.UserData(
-                    id=user.id,
-                    username=user.username,
-                    email=user.email,
-                    role=user.role,
-                ),
+                blog=self.blog_to_data(blog),
+                user=user,
             )
 
         except grpc.RpcError as exc:
@@ -119,8 +130,256 @@ class AggregationService(
             if blog_channel is not None:
                 blog_channel.close()
 
-            if user_channel is not None:
-                user_channel.close()
+    # دریافت فهرست بلاگ‌ها
+    def GetAggregatedBlogs(self, request, context):
+        blog_channel = None
+
+        try:
+            blog_channel = grpc.insecure_channel(BLOG_ADDRESS)
+
+            blog_stub = blog_pb2_grpc.BlogServiceStub(
+                blog_channel
+            )
+
+            response = blog_stub.GetBlogs(
+                blog_pb2.Empty(),
+                timeout=5,
+            )
+
+            return aggregation_pb2.GetAggregatedBlogsResponse(
+                blogs=[
+                    self.blog_to_data(blog)
+                    for blog in response.blogs
+                ]
+            )
+
+        except grpc.RpcError as exc:
+            print(
+                "Get blogs error:",
+                exc.code(),
+                repr(exc.details()),
+            )
+
+            context.abort(
+                exc.code(),
+                exc.details() or "Could not get blogs",
+            )
+
+        except Exception as exc:
+            print("Unexpected error:", repr(exc))
+
+            context.abort(
+                grpc.StatusCode.INTERNAL,
+                "Unexpected error in Aggregation Service",
+            )
+
+        finally:
+            if blog_channel is not None:
+                blog_channel.close()
+
+    # ایجاد بلاگ
+    def CreateAggregatedBlog(self, request, context):
+        blog_channel = None
+
+        try:
+            blog_channel = grpc.insecure_channel(BLOG_ADDRESS)
+
+            blog_stub = blog_pb2_grpc.BlogServiceStub(
+                blog_channel
+            )
+
+            file_id = (
+                request.file_id
+                if request.HasField("file_id")
+                else 0
+            )
+
+            blog = blog_stub.CreateBlog(
+                blog_pb2.CreateBlogRequest(
+                    title=request.title,
+                    slug=request.slug,
+                    description=request.description,
+                    content=request.content,
+                    user_id=request.user_id,
+                    file_id=file_id,
+                ),
+                timeout=5,
+            )
+
+            return aggregation_pb2.CreateAggregatedBlogResponse(
+                blog=self.blog_to_data(blog)
+            )
+
+        except grpc.RpcError as exc:
+            print(
+                "Create blog error:",
+                exc.code(),
+                repr(exc.details()),
+            )
+
+            context.abort(
+                exc.code(),
+                exc.details() or "Could not create blog",
+            )
+
+        except Exception as exc:
+            print("Unexpected error:", repr(exc))
+
+            context.abort(
+                grpc.StatusCode.INTERNAL,
+                "Unexpected error in Aggregation Service",
+            )
+
+        finally:
+            if blog_channel is not None:
+                blog_channel.close()
+
+    # ویرایش بلاگ
+    def UpdateAggregatedBlog(self, request, context):
+        blog_channel = None
+
+        try:
+            blog_channel = grpc.insecure_channel(BLOG_ADDRESS)
+
+            blog_stub = blog_pb2_grpc.BlogServiceStub(
+                blog_channel
+            )
+
+            # ابتدا اطلاعات فعلی بلاگ را دریافت می‌کنیم
+            current_blog = blog_stub.GetBlog(
+                blog_pb2.BlogRequest(
+                    blog_id=request.blog_id
+                ),
+                timeout=5,
+            )
+
+            # BlogService در UpdateBlog امکان تغییر user_id ندارد
+            if (
+                request.HasField("user_id")
+                and request.user_id != current_blog.user_id
+            ):
+                context.abort(
+                    grpc.StatusCode.INVALID_ARGUMENT,
+                    "Changing user_id is not supported by BlogService",
+                )
+
+            # فقط فیلدهایی که ارسال شده‌اند تغییر می‌کنند
+            title = (
+                request.title
+                if request.HasField("title")
+                else current_blog.title
+            )
+
+            slug = (
+                request.slug
+                if request.HasField("slug")
+                else current_blog.slug
+            )
+
+            description = (
+                request.description
+                if request.HasField("description")
+                else current_blog.description
+            )
+
+            content = (
+                request.content
+                if request.HasField("content")
+                else current_blog.content
+            )
+
+            file_id = (
+                request.file_id
+                if request.HasField("file_id")
+                else current_blog.file_id
+            )
+
+            blog = blog_stub.UpdateBlog(
+                blog_pb2.UpdateBlogRequest(
+                    blog_id=request.blog_id,
+                    title=title,
+                    slug=slug,
+                    description=description,
+                    content=content,
+                    file_id=file_id,
+                ),
+                timeout=5,
+            )
+
+            return aggregation_pb2.UpdateAggregatedBlogResponse(
+                blog=self.blog_to_data(blog)
+            )
+
+        except grpc.RpcError as exc:
+            print(
+                "Update blog error:",
+                exc.code(),
+                repr(exc.details()),
+            )
+
+            context.abort(
+                exc.code(),
+                exc.details() or "Could not update blog",
+            )
+
+        except Exception as exc:
+            print("Unexpected error:", repr(exc))
+
+            context.abort(
+                grpc.StatusCode.INTERNAL,
+                "Unexpected error in Aggregation Service",
+            )
+
+        finally:
+            if blog_channel is not None:
+                blog_channel.close()
+
+    # حذف بلاگ
+    def DeleteAggregatedBlog(self, request, context):
+        blog_channel = None
+
+        try:
+            blog_channel = grpc.insecure_channel(BLOG_ADDRESS)
+
+            blog_stub = blog_pb2_grpc.BlogServiceStub(
+                blog_channel
+            )
+
+            blog_stub.DeleteBlog(
+                blog_pb2.DeleteBlogRequest(
+                    blog_id=request.blog_id
+                ),
+                timeout=5,
+            )
+
+            return aggregation_pb2.DeleteAggregatedBlogResponse(
+                success=True,
+                message="Blog deleted successfully",
+            )
+
+        except grpc.RpcError as exc:
+            print(
+                "Delete blog error:",
+                exc.code(),
+                repr(exc.details()),
+            )
+
+            context.abort(
+                exc.code(),
+                exc.details() or "Could not delete blog",
+            )
+
+        except Exception as exc:
+            print("Unexpected error:", repr(exc))
+
+            context.abort(
+                grpc.StatusCode.INTERNAL,
+                "Unexpected error in Aggregation Service",
+            )
+
+        finally:
+            if blog_channel is not None:
+                blog_channel.close()
 
 
 def serve():
