@@ -1,0 +1,90 @@
+
+syntax = "proto3";
+
+package aggregation;
+
+service AggregationService {
+    rpc GetAggregatedBlog(AggregatedBlogRequest)
+        returns (AggregatedBlogResponse);
+
+    rpc GetAggregatedBlogs(GetAggregatedBlogsRequest)
+        returns (GetAggregatedBlogsResponse);
+
+    rpc CreateAggregatedBlog(CreateAggregatedBlogRequest)
+        returns (CreateAggregatedBlogResponse);
+
+    rpc UpdateAggregatedBlog(UpdateAggregatedBlogRequest)
+        returns (UpdateAggregatedBlogResponse);
+
+    rpc DeleteAggregatedBlog(DeleteAggregatedBlogRequest)
+        returns (DeleteAggregatedBlogResponse);
+}
+
+message AggregatedBlogRequest {
+    int32 blog_id = 1;
+}
+
+message AggregatedBlogResponse {
+    BlogData blog = 1;
+    UserData user = 2;
+}
+
+message GetAggregatedBlogsRequest {
+}
+
+message GetAggregatedBlogsResponse {
+    repeated BlogData blogs = 1;
+}
+
+message CreateAggregatedBlogRequest {
+    string title = 1;
+    string slug = 2;
+    string description = 3;
+    string content = 4;
+    int32 user_id = 5;
+    optional int32 file_id = 6;
+}
+
+message CreateAggregatedBlogResponse {
+    BlogData blog = 1;
+}
+
+message UpdateAggregatedBlogRequest {
+    int32 blog_id = 1;
+    optional string title = 2;
+    optional string slug = 3;
+    optional string description = 4;
+    optional string content = 5;
+    optional int32 user_id = 6;
+    optional int32 file_id = 7;
+}
+
+message UpdateAggregatedBlogResponse {
+    BlogData blog = 1;
+}
+
+message DeleteAggregatedBlogRequest {
+    int32 blog_id = 1;
+}
+
+message DeleteAggregatedBlogResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message BlogData {
+    int32 id = 1;
+    string title = 2;
+    string slug = 3;
+    string description = 4;
+    string content = 5;
+    int32 user_id = 6;
+    int32 file_id = 7;
+}
+
+message UserData {
+    int32 id = 1;
+    string username = 2;
+    string email = 3;
+    string role = 4;
+}

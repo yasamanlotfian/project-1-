@@ -1,0 +1,48 @@
+
+syntax = "proto3";
+
+package tag;
+
+service TagService {
+    rpc GetTags (Empty) returns (TagList);
+    rpc GetTag (TagRequest) returns (TagResponse);
+    rpc CreateTag (CreateTagRequest) returns (TagResponse);
+    rpc UpdateTag (UpdateTagRequest) returns (TagResponse);
+    rpc DeleteTag (DeleteTagRequest) returns (TagResponse);
+    rpc GetTagsByIds (GetTagsByIdsRequest) returns (TagList);
+}
+
+message Empty {
+}
+
+message TagRequest {
+    int32 tag_id = 1;
+}
+
+message CreateTagRequest {
+    string name = 1;
+}
+
+message UpdateTagRequest {
+    int32 tag_id = 1;
+    string name = 2;
+}
+
+message DeleteTagRequest {
+    int32 tag_id = 1;
+}
+
+message GetTagsByIdsRequest {
+    repeated int32 ids = 1;
+}
+
+message TagResponse {
+    int32 id = 1;
+    string name = 2;
+    string created_at = 3;
+    string updated_at = 4;
+}
+
+message TagList {
+    repeated TagResponse tags = 1;
+}

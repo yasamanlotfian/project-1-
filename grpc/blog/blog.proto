@@ -1,0 +1,69 @@
+
+syntax = "proto3";
+
+package blog;
+
+service BlogService {
+    rpc GetBlogs (Empty) returns (BlogList);
+    rpc GetBlog (BlogRequest) returns (BlogResponse);
+    rpc CreateBlog (CreateBlogRequest) returns (BlogResponse);
+    rpc UpdateBlog (UpdateBlogRequest) returns (BlogResponse);
+    rpc DeleteBlog (DeleteBlogRequest) returns (BlogResponse);
+}
+
+message Empty {}
+
+message BlogRequest {
+    int32 blog_id = 1;
+}
+
+message CreateBlogRequest {
+    string title = 1;
+    string slug = 2;
+    string description = 3;
+    string content = 4;
+    int32 user_id = 5;
+    int32 file_id = 6;
+}
+
+message UpdateBlogRequest {
+    int32 blog_id = 1;
+    string title = 2;
+    string slug = 3;
+    string description = 4;
+    string content = 5;
+    int32 file_id = 6;
+}
+
+message DeleteBlogRequest {
+    int32 blog_id = 1;
+}
+
+message Category {
+    int32 id = 1;
+    string name = 2;
+}
+
+message Tag {
+    int32 id = 1;
+    string name = 2;
+}
+
+message BlogResponse {
+    int32 id = 1;
+    string title = 2;
+    string slug = 3;
+    string description = 4;
+    string content = 5;
+    int32 file_id = 6;
+    int32 user_id = 7;
+    int32 view_num = 8;
+    string path_photo = 9;
+
+    Category category = 10;
+    repeated Tag tags = 11;
+}
+
+message BlogList {
+    repeated BlogResponse blogs = 1;
+}

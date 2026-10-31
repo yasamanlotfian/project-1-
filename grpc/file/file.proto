@@ -1,0 +1,57 @@
+
+syntax = "proto3";
+
+package file;
+
+service FileService {
+    rpc GetFiles (Empty) returns (FileList);
+    rpc GetFile (FileRequest) returns (FileResponse);
+    rpc UploadFile (UploadFileRequest) returns (FileResponse);
+    rpc UpdateFile (UpdateFileRequest) returns (FileResponse);
+    rpc DeleteFile (FileRequest) returns (DeleteResponse);
+}
+
+message Empty {}
+
+message FileRequest {
+    int32 file_id = 1;
+}
+
+message UploadFileRequest {
+    string filename = 1;
+    bytes content = 2;
+    string mime_type = 3;
+    string file_type = 4;
+}
+
+message UpdateFileRequest {
+    int32 file_id = 1;
+    string filename = 2;
+    string mime_type = 3;
+    string file_type = 4;
+}
+
+message FileResponse {
+    int32 id = 1;
+    string filename = 2;
+    string url = 3;
+    string mime_type = 4;
+    string file_type = 5;
+    int64 size = 6;
+    string created_at = 7;
+    string updated_at = 8;
+
+    string original_file_url = 9;
+    string optimized_file_url = 10;
+    string crop_file_url = 11;
+    string path_photo = 12;
+}
+
+message FileList {
+    repeated FileResponse files = 1;
+}
+
+message DeleteResponse {
+    bool success = 1;
+    string message = 2;
+}

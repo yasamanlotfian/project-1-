@@ -1,0 +1,52 @@
+
+syntax = "proto3";
+
+package comment;
+
+service CommentService {
+
+    rpc GetComments (Empty) returns (CommentList);
+
+    rpc GetComment (CommentRequest) returns (CommentResponse);
+
+    rpc CreateComment (CreateCommentRequest) returns (CommentResponse);
+
+    rpc UpdateComment (UpdateCommentRequest) returns (CommentResponse);
+
+    rpc DeleteComment (DeleteCommentRequest) returns (CommentResponse);
+}
+
+message Empty {
+}
+
+message CommentRequest {
+    int32 comment_id = 1;
+}
+
+message CreateCommentRequest {
+    string name = 1;
+    int32 blog_id = 2;
+    string content = 3;
+}
+
+message UpdateCommentRequest {
+    int32 comment_id = 1;
+    string name = 2;
+    string content = 3;
+}
+
+message DeleteCommentRequest {
+    int32 comment_id = 1;
+}
+
+message CommentResponse {
+    int32 id = 1;
+    string name = 2;
+    int32 blog_id = 3;
+    string content = 4;
+    string created_at = 5;
+}
+
+message CommentList {
+    repeated CommentResponse comments = 1;
+}

@@ -1,0 +1,54 @@
+
+syntax = "proto3";
+
+package gallery;
+
+service GalleryService {
+    rpc GetGalleries (Empty) returns (GalleryList);
+    rpc GetGallery (GalleryRequest) returns (GalleryResponse);
+    rpc CreateGallery (CreateGalleryRequest) returns (GalleryResponse);
+    rpc UpdateGallery (UpdateGalleryRequest) returns (GalleryResponse);
+    rpc DeleteGallery (DeleteGalleryRequest) returns (GalleryResponse);
+    rpc GetGalleryByFileId (FileRequest) returns (GalleryResponse);
+}
+
+message Empty {}
+
+message GalleryRequest {
+    int32 gallery_id = 1;
+}
+
+message FileRequest {
+    int32 file_id = 1;
+}
+
+message CreateGalleryRequest {
+    string title = 1;
+    int32 file_id = 2;
+}
+
+message UpdateGalleryRequest {
+    int32 gallery_id = 1;
+    string title = 2;
+    int32 file_id = 3;
+}
+
+message DeleteGalleryRequest {
+    int32 gallery_id = 1;
+}
+
+message GalleryResponse {
+    int32 id = 1;
+    string title = 2;
+    int32 file_id = 3;
+    string filename = 4;
+    string original_file_url = 5;
+    string optimized_file_url = 6;
+    string crop_file_url = 7;
+    string mime_type = 8;
+    string file_type = 9;
+}
+
+message GalleryList {
+    repeated GalleryResponse galleries = 1;
+}
