@@ -44,6 +44,42 @@ class AggregatedBlogPatch(BaseModel):
     file_id: int | None = None
 
 
+class AggregatedBlogResponse(BaseModel):
+    id: int
+    title: str
+    slug: str
+    description: str
+    content: str
+    user_id: int
+    file_id: int
+
+
+class AggregatedUserResponse(BaseModel):
+    id: int
+    username: str
+    email: str
+    role: str
+
+
+class AggregatedBlogDetailResponse(BaseModel):
+    blog: AggregatedBlogResponse
+    user: AggregatedUserResponse
+
+
+class AggregatedBlogListResponse(BaseModel):
+    blogs: list[AggregatedBlogResponse]
+
+
+class AggregatedBlogMutationResponse(BaseModel):
+    message: str
+    blog: AggregatedBlogResponse
+
+
+class AggregatedBlogDeleteResponse(BaseModel):
+    message: str
+    success: bool
+
+
 def get_aggregation_stub():
     channel = grpc.insecure_channel("localhost:5058")
     stub = aggregation_pb2_grpc.AggregationServiceStub(channel)
@@ -57,7 +93,7 @@ def grpc_error(exc: grpc.RpcError):
             "grpc_code": exc.code().name,
             "message": exc.details(),
         },
-    )
+    ) from exc
 
 
 def blog_to_dict(blog):
@@ -78,9 +114,39 @@ def scalar():
         openapi_url=app.openapi_url,
         title=app.title,
     )
-  
 
-@app.get("/aggregation/blogs/{blog_id}")
+
+@app.get(
+    "/aggregation/blogs",
+    response_model=AggregatedBlogListResponse,
+)
+def get_aggregated_blogs():
+    channel, stub = get_aggregation_stub()
+
+    try:
+        response = stub.GetAggregatedBlogs(
+            aggregation_pb2.GetAggregatedBlogsRequest(),
+            timeout=10,
+        )
+
+        return {
+            "blogs": [
+                blog_to_dict(blog)
+                for blog in response.blogs
+            ]
+        }
+
+    except grpc.RpcError as exc:
+        grpc_error(exc)
+
+    finally:
+        channel.close()
+
+
+@app.get(
+    "/aggregation/blogs/{blog_id}",
+    response_model=AggregatedBlogDetailResponse,
+)
 def get_aggregated_blog(blog_id: int):
     channel, stub = get_aggregation_stub()
 
@@ -109,7 +175,11 @@ def get_aggregated_blog(blog_id: int):
         channel.close()
 
 
-@app.post("/aggregation/blogs", status_code=201)
+@app.post(
+    "/aggregation/blogs",
+    status_code=201,
+    response_model=AggregatedBlogMutationResponse,
+)
 def create_aggregated_blog(data: AggregatedBlogCreate):
     channel, stub = get_aggregation_stub()
 
@@ -135,7 +205,10 @@ def create_aggregated_blog(data: AggregatedBlogCreate):
         channel.close()
 
 
-@app.patch("/aggregation/blogs/{blog_id}")
+@app.patch(
+    "/aggregation/blogs/{blog_id}",
+    response_model=AggregatedBlogMutationResponse,
+)
 def update_aggregated_blog(
     blog_id: int,
     data: AggregatedBlogPatch,
@@ -174,7 +247,10 @@ def update_aggregated_blog(
         channel.close()
 
 
-@app.delete("/aggregation/blogs/{blog_id}")
+@app.delete(
+    "/aggregation/blogs/{blog_id}",
+    response_model=AggregatedBlogDeleteResponse,
+)
 def delete_aggregated_blog(blog_id: int):
     channel, stub = get_aggregation_stub()
 
@@ -207,3 +283,4 @@ if __name__ == "__main__":
         port=7009,
         reload=True,
     )
+    
