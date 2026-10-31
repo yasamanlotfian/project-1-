@@ -25,7 +25,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 app.include_router(aggregation_router)
 
 
@@ -62,8 +61,6 @@ SERVICES = {
 
 
 def rewrite_refs(data, prefix):
-    """Rewrite local OpenAPI component references."""
-
     if isinstance(data, dict):
         result = {}
 
@@ -95,7 +92,10 @@ def rewrite_refs(data, prefix):
         return result
 
     if isinstance(data, list):
-        return [rewrite_refs(item, prefix) for item in data]
+        return [
+            rewrite_refs(item, prefix)
+            for item in data
+        ]
 
     return data
 
@@ -136,6 +136,7 @@ def build_openapi():
                 openapi_url,
                 timeout=10,
             )
+
             response.raise_for_status()
             spec = response.json()
 
@@ -190,7 +191,6 @@ def build_openapi():
 
                 operation["x-original-path"] = path
 
-                # مسیرهای ورود و ثبت‌نام کاربر بدون JWT
                 if (
                     service_key == "User"
                     and path.rstrip("/") in {
@@ -204,7 +204,6 @@ def build_openapi():
                         {"BearerAuth": []}
                     ]
 
-        # ادغام components
         for section, items in spec.get("components", {}).items():
             if not isinstance(items, dict):
                 continue
@@ -222,7 +221,6 @@ def build_openapi():
                     service_key,
                 )
 
-        # ادغام tagها
         for tag in spec.get("tags", []):
             tag_name = tag.get("name")
 
@@ -232,57 +230,30 @@ def build_openapi():
                     "description": tag.get("description", ""),
                 })
 
-    # مستندات مسیر Aggregation
-    combined["paths"]["/aggregation/blogs/{blog_id}"] = {
-        "get": {
-            "tags": ["Aggregation"],
-            "summary": "Get aggregated blog and user",
-            "description": (
-                "Returns blog and user information from the "
-                "Aggregation gRPC service."
-            ),
-            "operationId": "get_aggregated_blog",
-            "parameters": [
-                {
-                    "name": "blog_id",
-                    "in": "path",
-                    "required": True,
-                    "description": "ID of the blog",
-                    "schema": {
-                        "type": "integer",
-                    },
-                }
-            ],
-            "responses": {
-                "200": {
-                    "description": "Aggregated blog and user",
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "blog": {
-                                        "type": "object",
-                                    },
-                                    "user": {
-                                        "type": "object",
-                                    },
-                                },
-                            }
-                        }
-                    },
-                },
-                "502": {
-                    "description": "Aggregation gRPC error",
-                },
-            },
-        }
-    }
+    aggregation_spec = app.openapi()
 
-    combined["tags"].append({
-        "name": "Aggregation",
-        "description": "Aggregated responses from gRPC services",
-    })
+    aggregation_paths = aggregation_spec.get("paths", {})
+
+    for path, path_item in aggregation_paths.items():
+        combined["paths"][path] = deepcopy(path_item)
+
+    for section, items in aggregation_spec.get(
+        "components", {}
+    ).items():
+        if not isinstance(items, dict):
+            continue
+
+        if section == "securitySchemes":
+            continue
+
+        combined["components"].setdefault(section, {})
+
+        for name, component in items.items():
+            combined["components"][section][name] = deepcopy(component)
+
+    for tag in aggregation_spec.get("tags", []):
+        if tag.get("name"):
+            combined["tags"].append(deepcopy(tag))
 
     if not combined["paths"]:
         raise HTTPException(
@@ -319,7 +290,7 @@ def home():
             key: service["url"]
             for key, service in SERVICES.items()
         },
-        "aggregation": "/aggregation/blogs/{blog_id}",
+        "aggregation": "/aggregation/blogs",
     }
 
 
