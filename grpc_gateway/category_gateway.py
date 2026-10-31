@@ -144,7 +144,7 @@ def get_categories(request: Request):
         response = stub.GetCategories(
             category_pb2.Empty(),
             metadata=metadata,
-            timeout=10,
+            timeout=30,
         )
 
         return MessageToDict(
@@ -167,7 +167,7 @@ def get_category(category_id: int, request: Request):
                 category_id=category_id,
             ),
             metadata=metadata,
-            timeout=10,
+            timeout=30,
         )
 
         return MessageToDict(
@@ -195,7 +195,7 @@ def create_category(
         response = stub.CreateCategory(
             grpc_request,
             metadata=metadata,
-            timeout=10,
+            timeout=30,
         )
 
         return MessageToDict(
@@ -224,7 +224,7 @@ def update_category(
         response = stub.UpdateCategory(
             grpc_request,
             metadata=metadata,
-            timeout=10,
+            timeout=30,
         )
 
         return MessageToDict(
