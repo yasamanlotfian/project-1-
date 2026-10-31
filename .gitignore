@@ -1,0 +1,9 @@
+.vscode/
+test_file.py
+uploads/
+venv_old/
+venv/
+__pycache__/
+*.pyc
+*.db
+.env
