@@ -70,13 +70,14 @@ def handle_grpc_error(exc: grpc.RpcError):
     ) from exc
 
 
+# دریافت تمام بلاگ‌ها
 @router.get("/blogs")
 def get_aggregated_blogs():
     channel, stub = get_aggregation_stub()
 
     try:
         response = stub.GetAggregatedBlogs(
-            aggregation_pb2.Empty(),
+            aggregation_pb2.GetAggregatedBlogsRequest(),
             timeout=10,
         )
 
@@ -94,6 +95,7 @@ def get_aggregated_blogs():
         channel.close()
 
 
+# دریافت یک بلاگ به همراه اطلاعات کاربر
 @router.get("/blogs/{blog_id}")
 def get_aggregated_blog(blog_id: int):
     channel, stub = get_aggregation_stub()
@@ -123,6 +125,7 @@ def get_aggregated_blog(blog_id: int):
         channel.close()
 
 
+# ایجاد بلاگ
 @router.post("/blogs", status_code=201)
 def create_aggregated_blog(data: AggregatedBlogCreate):
     channel, stub = get_aggregation_stub()
@@ -149,6 +152,7 @@ def create_aggregated_blog(data: AggregatedBlogCreate):
         channel.close()
 
 
+# ویرایش بلاگ
 @router.patch("/blogs/{blog_id}")
 def patch_aggregated_blog(
     blog_id: int,
