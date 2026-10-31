@@ -4,6 +4,7 @@ syntax = "proto3";
 package aggregation;
 
 service AggregationService {
+
     rpc GetAggregatedBlog(AggregatedBlogRequest)
         returns (AggregatedBlogResponse);
 
@@ -20,21 +21,26 @@ service AggregationService {
         returns (DeleteAggregatedBlogResponse);
 }
 
+
 message AggregatedBlogRequest {
     int32 blog_id = 1;
 }
+
 
 message AggregatedBlogResponse {
     BlogData blog = 1;
     UserData user = 2;
 }
 
+
 message GetAggregatedBlogsRequest {
 }
+
 
 message GetAggregatedBlogsResponse {
     repeated BlogData blogs = 1;
 }
+
 
 message CreateAggregatedBlogRequest {
     string title = 1;
@@ -45,9 +51,11 @@ message CreateAggregatedBlogRequest {
     optional int32 file_id = 6;
 }
 
+
 message CreateAggregatedBlogResponse {
     BlogData blog = 1;
 }
+
 
 message UpdateAggregatedBlogRequest {
     int32 blog_id = 1;
@@ -59,18 +67,22 @@ message UpdateAggregatedBlogRequest {
     optional int32 file_id = 7;
 }
 
+
 message UpdateAggregatedBlogResponse {
     BlogData blog = 1;
 }
+
 
 message DeleteAggregatedBlogRequest {
     int32 blog_id = 1;
 }
 
+
 message DeleteAggregatedBlogResponse {
     bool success = 1;
     string message = 2;
 }
+
 
 message BlogData {
     int32 id = 1;
@@ -81,6 +93,7 @@ message BlogData {
     int32 user_id = 6;
     int32 file_id = 7;
 }
+
 
 message UserData {
     int32 id = 1;
