@@ -25,10 +25,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
+# اتصال Router مربوط به Aggregation
 app.include_router(aggregation_router)
 
 
+# آدرس سرویس‌های REST
 SERVICES = {
     "User": {
         "name": "user service",
@@ -68,7 +69,9 @@ def rewrite_refs(data, prefix):
         result = {}
 
         for key, value in data.items():
+
             if key == "$ref" and isinstance(value, str):
+
                 component_prefix = "#/components/"
 
                 if value.startswith(component_prefix):
@@ -81,6 +84,7 @@ def rewrite_refs(data, prefix):
                 result[key] = value
 
             elif key == "security" and isinstance(value, list):
+
                 result[key] = [
                     {
                         f"{prefix}_{scheme}": scopes
@@ -95,14 +99,19 @@ def rewrite_refs(data, prefix):
         return result
 
     if isinstance(data, list):
-        return [rewrite_refs(item, prefix) for item in data]
+        return [
+            rewrite_refs(item, prefix)
+            for item in data
+        ]
 
     return data
 
 
 def build_openapi():
+
     combined = {
         "openapi": "3.1.0",
+
         "info": {
             "title": "Hair Salon Blog gRPC System API",
             "version": "1.0.0",
@@ -111,7 +120,9 @@ def build_openapi():
                 "File, Comment, Tag, Category and Aggregation services."
             ),
         },
+
         "paths": {},
+
         "components": {
             "securitySchemes": {
                 "BearerAuth": {
@@ -122,13 +133,17 @@ def build_openapi():
                 }
             }
         },
+
         "tags": [],
+
         "security": [
             {"BearerAuth": []}
         ],
     }
 
+    # دریافت OpenAPI سرویس‌های مختلف
     for service_key, service in SERVICES.items():
+
         openapi_url = f"{service['url']}/openapi.json"
 
         try:
@@ -136,10 +151,12 @@ def build_openapi():
                 openapi_url,
                 timeout=10,
             )
+
             response.raise_for_status()
             spec = response.json()
 
         except (requests.RequestException, ValueError) as exc:
+
             raise HTTPException(
                 status_code=503,
                 detail=(
@@ -151,12 +168,15 @@ def build_openapi():
         service_paths = spec.get("paths", {})
 
         if not isinstance(service_paths, dict):
+
             raise HTTPException(
                 status_code=502,
                 detail=f"Invalid OpenAPI paths from {service['name']}.",
             )
 
+        # ادغام مسیرهای سرویس
         for path, path_item in service_paths.items():
+
             new_path = f"/{service_key}{path}"
 
             combined["paths"][new_path] = rewrite_refs(
@@ -165,6 +185,7 @@ def build_openapi():
             )
 
             for method, operation in combined["paths"][new_path].items():
+
                 if method.lower() not in {
                     "get",
                     "post",
@@ -181,16 +202,18 @@ def build_openapi():
                     continue
 
                 if "tags" in operation:
+
                     operation["tags"] = [
                         f"{service['name']} - {tag}"
                         for tag in operation["tags"]
                     ]
+
                 else:
                     operation["tags"] = [service["name"]]
 
                 operation["x-original-path"] = path
 
-                # مسیرهای ورود و ثبت‌نام کاربر بدون JWT
+                # مسیرهای ورود و ثبت‌نام بدون JWT
                 if (
                     service_key == "User"
                     and path.rstrip("/") in {
@@ -199,13 +222,15 @@ def build_openapi():
                     }
                 ):
                     operation["security"] = []
+
                 else:
                     operation["security"] = [
                         {"BearerAuth": []}
                     ]
 
-        # ادغام components
+        # ادغام Components
         for section, items in spec.get("components", {}).items():
+
             if not isinstance(items, dict):
                 continue
 
@@ -215,6 +240,7 @@ def build_openapi():
             combined["components"].setdefault(section, {})
 
             for name, component in items.items():
+
                 new_name = f"{service_key}_{name}"
 
                 combined["components"][section][new_name] = rewrite_refs(
@@ -222,18 +248,136 @@ def build_openapi():
                     service_key,
                 )
 
-        # ادغام tagها
+        # ادغام Tags
         for tag in spec.get("tags", []):
+
             tag_name = tag.get("name")
 
             if tag_name:
+
                 combined["tags"].append({
                     "name": f"{service['name']} - {tag_name}",
                     "description": tag.get("description", ""),
                 })
 
-    # مستندات مسیر Aggregation
+    # ==========================================
+    # Aggregation OpenAPI Documentation
+    # ==========================================
+
+    # GET ALL BLOGS
+    # POST CREATE BLOG
+
+    combined["paths"]["/aggregation/blogs"] = {
+
+        "get": {
+            "tags": ["Aggregation"],
+            "summary": "Get all aggregated blogs",
+            "operationId": "get_aggregated_blogs",
+
+            "responses": {
+                "200": {
+                    "description": "List of aggregated blogs",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {"type": "integer"},
+                                        "title": {"type": "string"},
+                                        "slug": {"type": "string"},
+                                        "description": {"type": "string"},
+                                        "content": {"type": "string"},
+                                        "user_id": {"type": "integer"},
+                                        "file_id": {"type": "integer"},
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+
+                "502": {
+                    "description": "Aggregation gRPC error",
+                },
+            },
+        },
+
+        "post": {
+            "tags": ["Aggregation"],
+            "summary": "Create aggregated blog",
+            "operationId": "create_aggregated_blog",
+
+            "requestBody": {
+                "required": True,
+
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+
+                            "required": [
+                                "title",
+                                "slug",
+                                "user_id",
+                            ],
+
+                            "properties": {
+                                "title": {
+                                    "type": "string",
+                                },
+
+                                "slug": {
+                                    "type": "string",
+                                },
+
+                                "description": {
+                                    "type": "string",
+                                },
+
+                                "content": {
+                                    "type": "string",
+                                },
+
+                                "user_id": {
+                                    "type": "integer",
+                                },
+
+                                "file_id": {
+                                    "anyOf": [
+                                        {"type": "integer"},
+                                        {"type": "null"},
+                                    ]
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+
+            "responses": {
+                "200": {
+                    "description": "Blog created",
+                },
+
+                "422": {
+                    "description": "Validation error",
+                },
+
+                "502": {
+                    "description": "Aggregation gRPC error",
+                },
+            },
+        },
+    }
+
+    # GET BLOG
+    # PATCH UPDATE BLOG
+    # DELETE BLOG
+
     combined["paths"]["/aggregation/blogs/{blog_id}"] = {
+
         "get": {
             "tags": ["Aggregation"],
             "summary": "Get aggregated blog and user",
@@ -242,6 +386,7 @@ def build_openapi():
                 "Aggregation gRPC service."
             ),
             "operationId": "get_aggregated_blog",
+
             "parameters": [
                 {
                     "name": "blog_id",
@@ -253,30 +398,130 @@ def build_openapi():
                     },
                 }
             ],
+
             "responses": {
                 "200": {
                     "description": "Aggregated blog and user",
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "blog": {
-                                        "type": "object",
-                                    },
-                                    "user": {
-                                        "type": "object",
-                                    },
-                                },
-                            }
-                        }
-                    },
                 },
+
+                "404": {
+                    "description": "Blog not found",
+                },
+
                 "502": {
                     "description": "Aggregation gRPC error",
                 },
             },
-        }
+        },
+
+        "patch": {
+            "tags": ["Aggregation"],
+            "summary": "Update aggregated blog",
+            "operationId": "update_aggregated_blog",
+
+            "parameters": [
+                {
+                    "name": "blog_id",
+                    "in": "path",
+                    "required": True,
+                    "description": "ID of the blog",
+                    "schema": {
+                        "type": "integer",
+                    },
+                }
+            ],
+
+            "requestBody": {
+                "required": True,
+
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+
+                            "properties": {
+                                "title": {
+                                    "type": "string",
+                                },
+
+                                "slug": {
+                                    "type": "string",
+                                },
+
+                                "description": {
+                                    "type": "string",
+                                },
+
+                                "content": {
+                                    "type": "string",
+                                },
+
+                                "user_id": {
+                                    "type": "integer",
+                                },
+
+                                "file_id": {
+                                    "anyOf": [
+                                        {"type": "integer"},
+                                        {"type": "null"},
+                                    ]
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+
+            "responses": {
+                "200": {
+                    "description": "Blog updated",
+                },
+
+                "404": {
+                    "description": "Blog not found",
+                },
+
+                "422": {
+                    "description": "Validation error",
+                },
+
+                "502": {
+                    "description": "Aggregation gRPC error",
+                },
+            },
+        },
+
+        "delete": {
+            "tags": ["Aggregation"],
+            "summary": "Delete aggregated blog",
+            "operationId": "delete_aggregated_blog",
+
+            "parameters": [
+                {
+                    "name": "blog_id",
+                    "in": "path",
+                    "required": True,
+                    "description": "ID of the blog",
+                    "schema": {
+                        "type": "integer",
+                    },
+                }
+            ],
+
+            "responses": {
+                "200": {
+                    "description": "Blog deleted",
+                },
+
+                "404": {
+                    "description": "Blog not found",
+                },
+
+                "502": {
+                    "description": "Aggregation gRPC error",
+                },
+            },
+        },
     }
 
     combined["tags"].append({
@@ -285,6 +530,7 @@ def build_openapi():
     })
 
     if not combined["paths"]:
+
         raise HTTPException(
             status_code=502,
             detail=(
@@ -296,35 +542,45 @@ def build_openapi():
     return combined
 
 
+# Unified OpenAPI
 @app.get("/openapi.json", include_in_schema=False)
 def unified_openapi():
+
     return build_openapi()
 
 
+# Scalar Documentation
 @app.get("/scalar", include_in_schema=False)
 def scalar_docs():
+
     return get_scalar_api_reference(
         openapi_url="/openapi.json",
         title="Hair Salon Blog gRPC System API - Unified Scalar",
     )
 
 
+# Home
 @app.get("/", include_in_schema=False)
 def home():
+
     return {
         "message": "Unified gRPC Gateway Documentation",
         "scalar": "/scalar",
         "openapi": "/openapi.json",
+
         "services": {
             key: service["url"]
             for key, service in SERVICES.items()
         },
+
         "aggregation": "/aggregation/blogs/{blog_id}",
     }
 
 
+# Proxy for REST services
 @app.api_route(
     "/{service}/{path:path}",
+
     methods=[
         "GET",
         "POST",
@@ -333,10 +589,13 @@ def home():
         "DELETE",
         "OPTIONS",
     ],
+
     include_in_schema=False,
 )
 async def proxy(service: str, path: str, request: Request):
+
     if service not in SERVICES:
+
         raise HTTPException(
             status_code=404,
             detail="Service not found",
@@ -360,6 +619,7 @@ async def proxy(service: str, path: str, request: Request):
     }
 
     try:
+
         response = requests.request(
             method=request.method,
             url=target_url,
@@ -389,6 +649,7 @@ async def proxy(service: str, path: str, request: Request):
         )
 
     except requests.RequestException as exc:
+
         raise HTTPException(
             status_code=502,
             detail=f"{service} Gateway request failed: {exc}",
