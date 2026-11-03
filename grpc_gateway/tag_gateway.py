@@ -61,7 +61,7 @@ def custom_openapi():
 app.openapi = custom_openapi
 
 
-channel = grpc.insecure_channel("localhost:5057")
+channel = grpc.insecure_channel("localhost:5056")
 stub = tag_pb2_grpc.TagServiceStub(channel)
 
 
