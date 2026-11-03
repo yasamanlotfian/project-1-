@@ -1,5 +1,6 @@
 
 import sys
+import traceback
 from concurrent import futures
 
 import grpc
@@ -8,6 +9,12 @@ sys.path.insert(0, r"C:\Users\lotus\project")
 sys.path.insert(0, r"C:\Users\lotus\project\grpc\gallery")
 
 from database import SessionLocal
+
+import tables
+from sqlalchemy.orm import configure_mappers
+
+configure_mappers()
+
 from tables.gallery import Gallery
 from service.file_service import FileServiceClient
 
@@ -74,6 +81,7 @@ class GalleryService(
         self.get_file_info(file_id, context)
 
     def GetGalleries(self, request, context):
+
         print("GetGalleries request received")
 
         db = SessionLocal()
@@ -81,27 +89,54 @@ class GalleryService(
         try:
             galleries = db.query(Gallery).all()
 
-            return gallery_pb2.GalleryList(
-                galleries=[
-                    self.make_gallery_response(gallery, context)
-                    for gallery in galleries
-                ]
-            )
+            print("Galleries count:", len(galleries))
+
+            response = gallery_pb2.GalleryList()
+
+            for gallery in galleries:
+
+                print(
+                    "Processing gallery:",
+                    gallery.id,
+                    gallery.title,
+                    gallery.file_id,
+                )
+
+                gallery_response = self.make_gallery_response(
+                    gallery,
+                    context,
+                )
+
+                response.galleries.add().CopyFrom(
+                    gallery_response
+                )
+
+            print("GetGalleries completed successfully")
+
+            return response
 
         except grpc.RpcError:
+            traceback.print_exc()
             raise
 
         except Exception as exc:
-            print(f"GetGalleries error: {exc}")
+
+            db.rollback()
+
+            print("ERROR TYPE:", type(exc).__name__)
+            print("ERROR REPR:", repr(exc))
+            traceback.print_exc()
+
             context.abort(
                 grpc.StatusCode.INTERNAL,
-                "Failed to retrieve galleries",
+                f"GetGalleries failed: {type(exc).__name__}: {repr(exc)}",
             )
 
         finally:
             db.close()
 
     def GetGallery(self, request, context):
+
         print("GetGallery request received")
 
         db = SessionLocal()
@@ -117,22 +152,29 @@ class GalleryService(
                     "Gallery not found",
                 )
 
-            return self.make_gallery_response(gallery, context)
+            return self.make_gallery_response(
+                gallery,
+                context,
+            )
 
         except grpc.RpcError:
             raise
 
         except Exception as exc:
-            print(f"GetGallery error: {exc}")
+
+            print("GetGallery error:", repr(exc))
+            traceback.print_exc()
+
             context.abort(
                 grpc.StatusCode.INTERNAL,
-                "Failed to retrieve gallery",
+                f"GetGallery failed: {type(exc).__name__}: {repr(exc)}",
             )
 
         finally:
             db.close()
 
     def CreateGallery(self, request, context):
+
         print("CreateGallery request received")
 
         self.validate_file(request.file_id, context)
@@ -149,25 +191,32 @@ class GalleryService(
             db.commit()
             db.refresh(gallery)
 
-            return self.make_gallery_response(gallery, context)
+            return self.make_gallery_response(
+                gallery,
+                context,
+            )
 
         except grpc.RpcError:
             db.rollback()
             raise
 
         except Exception as exc:
+
             db.rollback()
-            print(f"CreateGallery error: {exc}")
+
+            print("CreateGallery error:", repr(exc))
+            traceback.print_exc()
 
             context.abort(
                 grpc.StatusCode.INTERNAL,
-                "Failed to create gallery",
+                f"CreateGallery failed: {type(exc).__name__}: {repr(exc)}",
             )
 
         finally:
             db.close()
 
     def UpdateGallery(self, request, context):
+
         print("UpdateGallery request received")
 
         self.validate_file(request.file_id, context)
@@ -191,25 +240,32 @@ class GalleryService(
             db.commit()
             db.refresh(gallery)
 
-            return self.make_gallery_response(gallery, context)
+            return self.make_gallery_response(
+                gallery,
+                context,
+            )
 
         except grpc.RpcError:
             db.rollback()
             raise
 
         except Exception as exc:
+
             db.rollback()
-            print(f"UpdateGallery error: {exc}")
+
+            print("UpdateGallery error:", repr(exc))
+            traceback.print_exc()
 
             context.abort(
                 grpc.StatusCode.INTERNAL,
-                "Failed to update gallery",
+                f"UpdateGallery failed: {type(exc).__name__}: {repr(exc)}",
             )
 
         finally:
             db.close()
 
     def DeleteGallery(self, request, context):
+
         print("DeleteGallery request received")
 
         db = SessionLocal()
@@ -234,6 +290,8 @@ class GalleryService(
             db.delete(gallery)
             db.commit()
 
+            print("Gallery deleted:", request.gallery_id)
+
             return response
 
         except grpc.RpcError:
@@ -241,18 +299,22 @@ class GalleryService(
             raise
 
         except Exception as exc:
+
             db.rollback()
-            print(f"DeleteGallery error: {exc}")
+
+            print("DeleteGallery error:", repr(exc))
+            traceback.print_exc()
 
             context.abort(
                 grpc.StatusCode.INTERNAL,
-                "Failed to delete gallery",
+                f"DeleteGallery failed: {type(exc).__name__}: {repr(exc)}",
             )
 
         finally:
             db.close()
 
     def GetGalleryByFileId(self, request, context):
+
         print("GetGalleryByFileId request received")
 
         db = SessionLocal()
@@ -268,16 +330,22 @@ class GalleryService(
                     "Gallery not found for this file",
                 )
 
-            return self.make_gallery_response(gallery, context)
+            return self.make_gallery_response(
+                gallery,
+                context,
+            )
 
         except grpc.RpcError:
             raise
 
         except Exception as exc:
-            print(f"GetGalleryByFileId error: {exc}")
+
+            print("GetGalleryByFileId error:", repr(exc))
+            traceback.print_exc()
+
             context.abort(
                 grpc.StatusCode.INTERNAL,
-                "Failed to retrieve gallery by file ID",
+                f"GetGalleryByFileId failed: {type(exc).__name__}: {repr(exc)}",
             )
 
         finally:
@@ -285,6 +353,7 @@ class GalleryService(
 
 
 def serve():
+
     server = grpc.server(
         futures.ThreadPoolExecutor(max_workers=10)
     )
@@ -302,10 +371,12 @@ def serve():
         )
 
     server.start()
+
     print("Gallery gRPC Server running on port 5052")
 
     try:
         server.wait_for_termination()
+
     except KeyboardInterrupt:
         server.stop(grace=2)
 
