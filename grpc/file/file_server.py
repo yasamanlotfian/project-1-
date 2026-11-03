@@ -141,28 +141,33 @@ class FileService(file_pb2_grpc.FileServiceServicer):
 
     def GetFile(self, request, context):
         db = SessionLocal()
+
         try:
             file_obj = db.query(File).filter(
                 File.id == request.file_id
             ).first()
 
-            if file_obj is None:
-                context.abort(
-                    grpc.StatusCode.NOT_FOUND,
-                    "File not found"
-                )
+            if file_obj is not None:
+                response = make_file_response(file_obj)
+            else:
+                response = None
 
-            return make_file_response(file_obj)
-
-        except grpc.RpcError:
-            raise
         except Exception as exc:
             context.abort(
                 grpc.StatusCode.INTERNAL,
-                f"Could not get file: {exc}"
+                f"Could not get file: {str(exc)}"
             )
+
         finally:
             db.close()
+
+        if response is None:
+            context.abort(
+                grpc.StatusCode.NOT_FOUND,
+                f"File with ID {request.file_id} not found"
+            )
+
+        return response
 
     def UploadFile(self, request, context):
         if not request.filename:
