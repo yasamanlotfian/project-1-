@@ -62,7 +62,7 @@ def custom_openapi():
 app.openapi = custom_openapi
 
 
-channel = grpc.insecure_channel("localhost:5058")
+channel = grpc.insecure_channel("localhost:5057")
 stub = category_pb2_grpc.CategoryServiceStub(channel)
 
 
