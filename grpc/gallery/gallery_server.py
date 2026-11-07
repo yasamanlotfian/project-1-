@@ -27,7 +27,6 @@ class GalleryService(
 ):
 
     def get_file_info(self, file_id, context):
-  
 
         if not file_id:
             context.abort(
