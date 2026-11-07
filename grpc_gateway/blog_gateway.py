@@ -14,7 +14,7 @@ if str(PROJECT_ROOT) not in sys.path:
 import grpc
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.openapi.utils import get_openapi
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from google.protobuf.json_format import MessageToDict
 from grpc import RpcError
 from scalar_fastapi import get_scalar_api_reference
@@ -72,6 +72,8 @@ class CreateBlogRequest(BaseModel):
     content: str = ""
     user_id: int
     file_id: int | None = None
+    category_id: int
+    tag_ids: list[int] = Field(default_factory=list)
 
 
 class UpdateBlogRequest(BaseModel):
@@ -140,10 +142,9 @@ def convert_blog_response(response):
     result.setdefault("view_num", 0)
     result.setdefault("path_photo", "")
 
-    # نام فیلد در blog.proto برابر category است.
+  
     result.setdefault("category", None)
 
-    # tags باید از پاسخ واقعی gRPC دریافت شود.
     result.setdefault("tags", [])
 
     return result
@@ -207,7 +208,10 @@ def create_blog(data: CreateBlogRequest, request: Request):
             description=data.description,
             content=data.content,
             user_id=data.user_id,
-            file_id=data.file_id or 0
+            file_id=data.file_id or 0,
+            category_id=data.category_id,
+            tag_ids=data.tag_ids
+
         )
 
         response = stub.CreateBlog(
