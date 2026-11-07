@@ -24,6 +24,8 @@ message CreateBlogRequest {
     string content = 4;
     int32 user_id = 5;
     int32 file_id = 6;
+      int32 category_id = 7;
+    repeated int32 tag_ids = 8;
 }
 
 message UpdateBlogRequest {

@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\nblog.proto\x12\x04\x62log\"\x07\n\x05\x45mpty\"\x1e\n\x0b\x42logRequest\x12\x0f\n\x07\x62log_id\x18\x01 \x01(\x05\"x\n\x11\x43reateBlogRequest\x12\r\n\x05title\x18\x01 \x01(\t\x12\x0c\n\x04slug\x18\x02 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x03 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x04 \x01(\t\x12\x0f\n\x07user_id\x18\x05 \x01(\x05\x12\x0f\n\x07\x66ile_id\x18\x06 \x01(\x05\"x\n\x11UpdateBlogRequest\x12\x0f\n\x07\x62log_id\x18\x01 \x01(\x05\x12\r\n\x05title\x18\x02 \x01(\t\x12\x0c\n\x04slug\x18\x03 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x04 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x05 \x01(\t\x12\x0f\n\x07\x66ile_id\x18\x06 \x01(\x05\"$\n\x11\x44\x65leteBlogRequest\x12\x0f\n\x07\x62log_id\x18\x01 \x01(\x05\"$\n\x08\x43\x61tegory\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x0c\n\x04name\x18\x02 \x01(\t\"\x1f\n\x03Tag\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x0c\n\x04name\x18\x02 \x01(\t\"\xe0\x01\n\x0c\x42logResponse\x12\n\n\x02id\x18\x01 \x01(\x05\x12\r\n\x05title\x18\x02 \x01(\t\x12\x0c\n\x04slug\x18\x03 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x04 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x05 \x01(\t\x12\x0f\n\x07\x66ile_id\x18\x06 \x01(\x05\x12\x0f\n\x07user_id\x18\x07 \x01(\x05\x12\x10\n\x08view_num\x18\x08 \x01(\x05\x12\x12\n\npath_photo\x18\t \x01(\t\x12 \n\x08\x63\x61tegory\x18\n \x01(\x0b\x32\x0e.blog.Category\x12\x17\n\x04tags\x18\x0b \x03(\x0b\x32\t.blog.Tag\"-\n\x08\x42logList\x12!\n\x05\x62logs\x18\x01 \x03(\x0b\x32\x12.blog.BlogResponse2\x99\x02\n\x0b\x42logService\x12\'\n\x08GetBlogs\x12\x0b.blog.Empty\x1a\x0e.blog.BlogList\x12\x30\n\x07GetBlog\x12\x11.blog.BlogRequest\x1a\x12.blog.BlogResponse\x12\x39\n\nCreateBlog\x12\x17.blog.CreateBlogRequest\x1a\x12.blog.BlogResponse\x12\x39\n\nUpdateBlog\x12\x17.blog.UpdateBlogRequest\x1a\x12.blog.BlogResponse\x12\x39\n\nDeleteBlog\x12\x17.blog.DeleteBlogRequest\x1a\x12.blog.BlogResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\nblog.proto\x12\x04\x62log\"\x07\n\x05\x45mpty\"\x1e\n\x0b\x42logRequest\x12\x0f\n\x07\x62log_id\x18\x01 \x01(\x05\"\x9e\x01\n\x11\x43reateBlogRequest\x12\r\n\x05title\x18\x01 \x01(\t\x12\x0c\n\x04slug\x18\x02 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x03 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x04 \x01(\t\x12\x0f\n\x07user_id\x18\x05 \x01(\x05\x12\x0f\n\x07\x66ile_id\x18\x06 \x01(\x05\x12\x13\n\x0b\x63\x61tegory_id\x18\x07 \x01(\x05\x12\x0f\n\x07tag_ids\x18\x08 \x03(\x05\"x\n\x11UpdateBlogRequest\x12\x0f\n\x07\x62log_id\x18\x01 \x01(\x05\x12\r\n\x05title\x18\x02 \x01(\t\x12\x0c\n\x04slug\x18\x03 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x04 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x05 \x01(\t\x12\x0f\n\x07\x66ile_id\x18\x06 \x01(\x05\"$\n\x11\x44\x65leteBlogRequest\x12\x0f\n\x07\x62log_id\x18\x01 \x01(\x05\"$\n\x08\x43\x61tegory\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x0c\n\x04name\x18\x02 \x01(\t\"\x1f\n\x03Tag\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x0c\n\x04name\x18\x02 \x01(\t\"\xe0\x01\n\x0c\x42logResponse\x12\n\n\x02id\x18\x01 \x01(\x05\x12\r\n\x05title\x18\x02 \x01(\t\x12\x0c\n\x04slug\x18\x03 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x04 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x05 \x01(\t\x12\x0f\n\x07\x66ile_id\x18\x06 \x01(\x05\x12\x0f\n\x07user_id\x18\x07 \x01(\x05\x12\x10\n\x08view_num\x18\x08 \x01(\x05\x12\x12\n\npath_photo\x18\t \x01(\t\x12 \n\x08\x63\x61tegory\x18\n \x01(\x0b\x32\x0e.blog.Category\x12\x17\n\x04tags\x18\x0b \x03(\x0b\x32\t.blog.Tag\"-\n\x08\x42logList\x12!\n\x05\x62logs\x18\x01 \x03(\x0b\x32\x12.blog.BlogResponse2\x99\x02\n\x0b\x42logService\x12\'\n\x08GetBlogs\x12\x0b.blog.Empty\x1a\x0e.blog.BlogList\x12\x30\n\x07GetBlog\x12\x11.blog.BlogRequest\x1a\x12.blog.BlogResponse\x12\x39\n\nCreateBlog\x12\x17.blog.CreateBlogRequest\x1a\x12.blog.BlogResponse\x12\x39\n\nUpdateBlog\x12\x17.blog.UpdateBlogRequest\x1a\x12.blog.BlogResponse\x12\x39\n\nDeleteBlog\x12\x17.blog.DeleteBlogRequest\x1a\x12.blog.BlogResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -35,20 +35,20 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_EMPTY']._serialized_end=27
   _globals['_BLOGREQUEST']._serialized_start=29
   _globals['_BLOGREQUEST']._serialized_end=59
-  _globals['_CREATEBLOGREQUEST']._serialized_start=61
-  _globals['_CREATEBLOGREQUEST']._serialized_end=181
-  _globals['_UPDATEBLOGREQUEST']._serialized_start=183
-  _globals['_UPDATEBLOGREQUEST']._serialized_end=303
-  _globals['_DELETEBLOGREQUEST']._serialized_start=305
-  _globals['_DELETEBLOGREQUEST']._serialized_end=341
-  _globals['_CATEGORY']._serialized_start=343
-  _globals['_CATEGORY']._serialized_end=379
-  _globals['_TAG']._serialized_start=381
-  _globals['_TAG']._serialized_end=412
-  _globals['_BLOGRESPONSE']._serialized_start=415
-  _globals['_BLOGRESPONSE']._serialized_end=639
-  _globals['_BLOGLIST']._serialized_start=641
-  _globals['_BLOGLIST']._serialized_end=686
-  _globals['_BLOGSERVICE']._serialized_start=689
-  _globals['_BLOGSERVICE']._serialized_end=970
+  _globals['_CREATEBLOGREQUEST']._serialized_start=62
+  _globals['_CREATEBLOGREQUEST']._serialized_end=220
+  _globals['_UPDATEBLOGREQUEST']._serialized_start=222
+  _globals['_UPDATEBLOGREQUEST']._serialized_end=342
+  _globals['_DELETEBLOGREQUEST']._serialized_start=344
+  _globals['_DELETEBLOGREQUEST']._serialized_end=380
+  _globals['_CATEGORY']._serialized_start=382
+  _globals['_CATEGORY']._serialized_end=418
+  _globals['_TAG']._serialized_start=420
+  _globals['_TAG']._serialized_end=451
+  _globals['_BLOGRESPONSE']._serialized_start=454
+  _globals['_BLOGRESPONSE']._serialized_end=678
+  _globals['_BLOGLIST']._serialized_start=680
+  _globals['_BLOGLIST']._serialized_end=725
+  _globals['_BLOGSERVICE']._serialized_start=728
+  _globals['_BLOGSERVICE']._serialized_end=1009
 # @@protoc_insertion_point(module_scope)
