@@ -105,6 +105,7 @@ class BlogService(blog_pb2_grpc.BlogServiceServicer):
             client.close()
 
     def add_category_and_tags(self, blog_response, blog):
+
         # افزودن دسته‌بندی
         if blog.category:
             blog_response.category.id = blog.category.id
@@ -236,19 +237,50 @@ class BlogService(blog_pb2_grpc.BlogServiceServicer):
                 input_slug
             )
 
+            # دریافت دسته‌بندی
+            category = db.query(Category).filter(
+                Category.id == request.category_id
+            ).first()
+
+            if not category:
+                context.abort(
+                    grpc.StatusCode.NOT_FOUND,
+                    "Category not found"
+                )
+
+            # دریافت تگ‌ها
+            tag_ids = list(request.tag_ids)
+
+            tags = (
+                db.query(Tag).filter(
+                    Tag.id.in_(tag_ids)
+                ).all()
+                if tag_ids else []
+            )
+
+            if len(tags) != len(set(tag_ids)):
+                context.abort(
+                    grpc.StatusCode.NOT_FOUND,
+                    "One or more tags not found"
+                )
+
+            # ایجاد بلاگ همراه دسته‌بندی و تگ‌ها
             blog = Blog(
                 title=request.title,
                 slug=unique_slug,
                 description=request.description,
                 content=request.content,
                 user_id=request.user_id,
-                file_id=request.file_id or None
+                file_id=request.file_id or None,
+                category=category,
+                tags=tags
             )
 
             db.add(blog)
             db.commit()
             db.refresh(blog)
 
+            # بارگذاری مجدد رابطه‌ها
             blog = (
                 db.query(Blog)
                 .options(
