@@ -73,6 +73,7 @@ class CreateGalleryRequest(BaseModel):
 
 class UpdateGalleryRequest(BaseModel):
     title: str
+    file_id: int
 
 
 def get_grpc_metadata(request: Request):
@@ -216,7 +217,7 @@ def create_gallery(data: CreateGalleryRequest, request: Request):
     metadata = get_grpc_metadata(request)
 
     try:
-    
+
         file_client.get_file(data.file_id)
 
         grpc_request = gallery_pb2.CreateGalleryRequest(
@@ -249,9 +250,12 @@ def update_gallery(
     metadata = get_grpc_metadata(request)
 
     try:
+        file_client.get_file(data.file_id)
+
         grpc_request = gallery_pb2.UpdateGalleryRequest(
             gallery_id=gallery_id,
             title=data.title,
+            file_id=data.file_id,
         )
 
         response = stub.UpdateGallery(
@@ -259,10 +263,12 @@ def update_gallery(
             metadata=metadata,
         )
 
-        return MessageToDict(
+        result = MessageToDict(
             response,
             preserving_proto_field_name=True,
         )
+
+        return add_file_urls(result)
 
     except RpcError as exc:
         handle_grpc_error(exc)
