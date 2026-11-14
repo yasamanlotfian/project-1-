@@ -1,155 +1,92 @@
 
+import sys
+from pathlib import Path
+
 import grpc
 
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
 
-from database import SessionLocal
-from tables.tag import Tag
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+CATEGORY_GRPC_DIR = PROJECT_ROOT / "grpc" / "category"
 
-import tag_pb2
-import tag_pb2_grpc
+if str(CATEGORY_GRPC_DIR) not in sys.path:
+    sys.path.insert(0, str(CATEGORY_GRPC_DIR))
 
-
-def to_proto(tag):
-    return tag_pb2.TagResponse(
-        id=tag.id,
-        name=tag.name,
-        created_at=(
-            tag.created_at.isoformat()
-            if tag.created_at else ""
-        ),
-        updated_at=(
-            tag.updated_at.isoformat()
-            if tag.updated_at else ""
-        ),
-    )
+import category_pb2
+import category_pb2_grpc
 
 
-class TagService(tag_pb2_grpc.TagServiceServicer):
+class CategoryServiceClient:
 
-    def CreateTag(self, request, context):
-        db: Session = SessionLocal()
+    def __init__(self, address="localhost:5057"):
+        self.channel = grpc.insecure_channel(address)
+        self.stub = category_pb2_grpc.CategoryServiceStub(
+            self.channel
+        )
 
-        try:
-            name = request.name.strip()
+    def get_categories(self, metadata=None):
+        return self.stub.GetCategories(
+            category_pb2.Empty(),
+            metadata=metadata,
+            timeout=10,
+        )
 
-            if not name:
-                context.abort(
-                    grpc.StatusCode.INVALID_ARGUMENT,
-                    "Tag name is required",
-                )
+    def get_category(self, category_id: int, metadata=None):
+        request = category_pb2.CategoryRequest(
+            category_id=category_id
+        )
 
-            tag = Tag(name=name)
-            db.add(tag)
-            db.commit()
-            db.refresh(tag)
+        return self.stub.GetCategory(
+            request,
+            metadata=metadata,
+            timeout=10,
+        )
 
-            return to_proto(tag)
+    def create_category(
+        self,
+        name: str,
+        metadata=None,
+    ):
+        request = category_pb2.CreateCategoryRequest(
+            name=name,
+        )
 
-        except IntegrityError:
-            db.rollback()
-            context.abort(
-                grpc.StatusCode.ALREADY_EXISTS,
-                "Tag already exists",
-            )
+        return self.stub.CreateCategory(
+            request,
+            metadata=metadata,
+            timeout=10,
+        )
 
-        finally:
-            db.close()
+    def update_category(
+        self,
+        category_id: int,
+        name: str,
+        metadata=None,
+    ):
+        request = category_pb2.UpdateCategoryRequest(
+            category_id=category_id,
+            name=name,
+        )
 
-    def GetTag(self, request, context):
-        db: Session = SessionLocal()
+        return self.stub.UpdateCategory(
+            request,
+            metadata=metadata,
+            timeout=10,
+        )
 
-        try:
-            tag = db.query(Tag).filter(
-                Tag.id == request.tag_id
-            ).first()
+    def delete_category(
+        self,
+        category_id: int,
+        metadata=None,
+    ):
+        request = category_pb2.DeleteCategoryRequest(
+            category_id=category_id
+        )
 
-            if tag is None:
-                context.abort(
-                    grpc.StatusCode.NOT_FOUND,
-                    "Tag not found",
-                )
+        return self.stub.DeleteCategory(
+            request,
+            metadata=metadata,
+            timeout=10,
+        )
 
-            return to_proto(tag)
-
-        finally:
-            db.close()
-
-    def GetTags(self, request, context):
-        db: Session = SessionLocal()
-
-        try:
-            tags = db.query(Tag).order_by(Tag.id).all()
-
-            return tag_pb2.TagList(
-                tags=[to_proto(tag) for tag in tags]
-            )
-
-        finally:
-            db.close()
-
-    def UpdateTag(self, request, context):
-        db: Session = SessionLocal()
-
-        try:
-            tag = db.query(Tag).filter(
-                Tag.id == request.tag_id
-            ).first()
-
-            if tag is None:
-                context.abort(
-                    grpc.StatusCode.NOT_FOUND,
-                    "Tag not found",
-                )
-
-            name = request.name.strip()
-
-            if not name:
-                context.abort(
-                    grpc.StatusCode.INVALID_ARGUMENT,
-                    "Tag name is required",
-                )
-
-            tag.name = name
-            db.commit()
-            db.refresh(tag)
-
-            return to_proto(tag)
-
-        except IntegrityError:
-            db.rollback()
-            context.abort(
-                grpc.StatusCode.ALREADY_EXISTS,
-                "Tag already exists",
-            )
-
-        finally:
-            db.close()
-
-    def DeleteTag(self, request, context):
-        db: Session = SessionLocal()
-
-        try:
-            tag = db.query(Tag).filter(
-                Tag.id == request.tag_id
-            ).first()
-
-            if tag is None:
-                context.abort(
-                    grpc.StatusCode.NOT_FOUND,
-                    "Tag not found",
-                )
-
-            db.delete(tag)
-            db.commit()
-
-            return tag_pb2.TagResponse(
-                id=tag.id,
-                name=tag.name,
-                created_at="",
-                updated_at="",
-            )
-
-        finally:
-            db.close()
+    def close(self):
+        self.channel.close()
