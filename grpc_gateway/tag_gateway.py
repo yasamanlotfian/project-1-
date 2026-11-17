@@ -14,7 +14,7 @@ if str(PROJECT_ROOT) not in sys.path:
 import grpc
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.openapi.utils import get_openapi
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from google.protobuf.json_format import MessageToDict
 from grpc import RpcError
 from scalar_fastapi import get_scalar_api_reference
@@ -65,13 +65,32 @@ channel = grpc.insecure_channel("localhost:5056")
 stub = tag_pb2_grpc.TagServiceStub(channel)
 
 
-
 class CreateTagRequest(BaseModel):
     name: str
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value):
+        value = value.strip()
+
+        if not value:
+            raise ValueError("Tag name is required")
+
+        return value
 
 
 class UpdateTagRequest(BaseModel):
     name: str
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value):
+        value = value.strip()
+
+        if not value:
+            raise ValueError("Tag name is required")
+
+        return value
 
 
 def get_grpc_metadata(request: Request):
@@ -89,40 +108,41 @@ def get_grpc_metadata(request: Request):
             detail="Authorization must use Bearer token",
         )
 
-    return (("authorization", authorization),)
+    token = authorization[7:].strip()
 
+    if not token:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid Bearer token",
+        )
+
+    return (("authorization", f"Bearer {token}"),)
 
 
 def handle_grpc_error(exc: RpcError):
     code = exc.code()
-    details = exc.details()
+    details = exc.details() or "gRPC service error"
 
-    if code == grpc.StatusCode.UNAUTHENTICATED:
-        raise HTTPException(
-            status_code=401,
-            detail=details or "Invalid or expired token",
-        )
-
-    if code == grpc.StatusCode.PERMISSION_DENIED:
-        raise HTTPException(
-            status_code=403,
-            detail=details or "Permission denied",
-        )
-
-    if code == grpc.StatusCode.NOT_FOUND:
-        raise HTTPException(
-            status_code=404,
-            detail=details or "Resource not found",
-        )
+    status_map = {
+        grpc.StatusCode.UNAUTHENTICATED: 401,
+        grpc.StatusCode.PERMISSION_DENIED: 403,
+        grpc.StatusCode.NOT_FOUND: 404,
+        grpc.StatusCode.INVALID_ARGUMENT: 400,
+        grpc.StatusCode.ALREADY_EXISTS: 409,
+        grpc.StatusCode.FAILED_PRECONDITION: 409,
+        grpc.StatusCode.RESOURCE_EXHAUSTED: 429,
+        grpc.StatusCode.UNAVAILABLE: 503,
+        grpc.StatusCode.DEADLINE_EXCEEDED: 504,
+        grpc.StatusCode.INTERNAL: 500,
+    }
 
     raise HTTPException(
-        status_code=502,
+        status_code=status_map.get(code, 502),
         detail={
             "grpc_code": code.name if code else "UNKNOWN",
-            "message": details or "gRPC service error",
+            "message": details,
         },
     )
-
 
 
 @app.get("/scalar", include_in_schema=False)
@@ -133,7 +153,6 @@ def scalar_docs():
     )
 
 
-
 @app.get("/tags/")
 def get_tags(request: Request):
     metadata = get_grpc_metadata(request)
@@ -142,7 +161,7 @@ def get_tags(request: Request):
         response = stub.GetTags(
             tag_pb2.Empty(),
             metadata=metadata,
-            timeout=10,
+            timeout=30,
         )
 
         return MessageToDict(
@@ -152,18 +171,23 @@ def get_tags(request: Request):
 
     except RpcError as exc:
         handle_grpc_error(exc)
-
 
 
 @app.get("/tags/{tag_id}")
 def get_tag(tag_id: int, request: Request):
     metadata = get_grpc_metadata(request)
 
+    if tag_id <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="tag_id must be greater than zero",
+        )
+
     try:
         response = stub.GetTag(
             tag_pb2.TagRequest(tag_id=tag_id),
             metadata=metadata,
-            timeout=10,
+            timeout=30,
         )
 
         return MessageToDict(
@@ -173,7 +197,6 @@ def get_tag(tag_id: int, request: Request):
 
     except RpcError as exc:
         handle_grpc_error(exc)
-
 
 
 @app.post("/tags/", status_code=201)
@@ -188,7 +211,7 @@ def create_tag(data: CreateTagRequest, request: Request):
         response = stub.CreateTag(
             grpc_request,
             metadata=metadata,
-            timeout=10,
+            timeout=30,
         )
 
         return MessageToDict(
@@ -198,7 +221,6 @@ def create_tag(data: CreateTagRequest, request: Request):
 
     except RpcError as exc:
         handle_grpc_error(exc)
-
 
 
 @app.patch("/tags/{tag_id}")
@@ -209,6 +231,12 @@ def update_tag(
 ):
     metadata = get_grpc_metadata(request)
 
+    if tag_id <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="tag_id must be greater than zero",
+        )
+
     try:
         grpc_request = tag_pb2.UpdateTagRequest(
             tag_id=tag_id,
@@ -218,7 +246,7 @@ def update_tag(
         response = stub.UpdateTag(
             grpc_request,
             metadata=metadata,
-            timeout=10,
+            timeout=30,
         )
 
         return MessageToDict(
@@ -230,10 +258,15 @@ def update_tag(
         handle_grpc_error(exc)
 
 
-
 @app.delete("/tags/{tag_id}")
 def delete_tag(tag_id: int, request: Request):
     metadata = get_grpc_metadata(request)
+
+    if tag_id <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="tag_id must be greater than zero",
+        )
 
     try:
         grpc_request = tag_pb2.DeleteTagRequest(
@@ -243,7 +276,7 @@ def delete_tag(tag_id: int, request: Request):
         response = stub.DeleteTag(
             grpc_request,
             metadata=metadata,
-            timeout=10,
+            timeout=30,
         )
 
         return MessageToDict(
@@ -255,10 +288,15 @@ def delete_tag(tag_id: int, request: Request):
         handle_grpc_error(exc)
 
 
-
 @app.post("/tags/by-ids")
 def get_tags_by_ids(ids: list[int], request: Request):
     metadata = get_grpc_metadata(request)
+
+    if any(tag_id <= 0 for tag_id in ids):
+        raise HTTPException(
+            status_code=400,
+            detail="All tag IDs must be greater than zero",
+        )
 
     try:
         grpc_request = tag_pb2.GetTagsByIdsRequest(
@@ -268,7 +306,7 @@ def get_tags_by_ids(ids: list[int], request: Request):
         response = stub.GetTagsByIds(
             grpc_request,
             metadata=metadata,
-            timeout=10,
+            timeout=30,
         )
 
         return MessageToDict(
