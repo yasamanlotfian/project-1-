@@ -45,16 +45,17 @@ class CategoryService(
                 .all()
             )
 
-            return category_pb2.CategoryList(
+            response = category_pb2.CategoryList(
                 categories=[
                     self.make_category_response(category)
                     for category in categories
                 ]
             )
 
+            return response
+
         except Exception as exc:
             print(f"GetCategories error: {exc}")
-
             context.abort(
                 grpc.StatusCode.INTERNAL,
                 "Failed to retrieve categories",
@@ -75,20 +76,8 @@ class CategoryService(
                 .first()
             )
 
-            if category is None:
-                context.abort(
-                    grpc.StatusCode.NOT_FOUND,
-                    "Category not found",
-                )
-
-            return self.make_category_response(category)
-
         except Exception as exc:
-            if isinstance(exc, grpc.RpcError):
-                raise
-
-            print(f"GetCategory error: {exc}")
-
+            print(f"GetCategory database error: {exc}")
             context.abort(
                 grpc.StatusCode.INTERNAL,
                 "Failed to retrieve category",
@@ -97,31 +86,40 @@ class CategoryService(
         finally:
             db.close()
 
+        if category is None:
+            context.abort(
+                grpc.StatusCode.NOT_FOUND,
+                "Category not found",
+            )
+
+        return self.make_category_response(category)
+
     def CreateCategory(self, request, context):
         print("CreateCategory request received")
+
+        name = request.name.strip()
+
+        if not name:
+            context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                "Category name is required",
+            )
 
         db = SessionLocal()
 
         try:
-            name = request.name.strip()
-
-            if not name:
-                context.abort(
-                    grpc.StatusCode.INVALID_ARGUMENT,
-                    "Category name is required",
-                )
-
             category = Category(name=name)
 
             db.add(category)
             db.commit()
             db.refresh(category)
 
-            return self.make_category_response(category)
+            response = self.make_category_response(category)
+
+            return response
 
         except IntegrityError:
             db.rollback()
-
             context.abort(
                 grpc.StatusCode.ALREADY_EXISTS,
                 "Category name already exists",
@@ -129,10 +127,6 @@ class CategoryService(
 
         except Exception as exc:
             db.rollback()
-
-            if isinstance(exc, grpc.RpcError):
-                raise
-
             print(f"CreateCategory error: {exc}")
 
             context.abort(
@@ -146,6 +140,14 @@ class CategoryService(
     def UpdateCategory(self, request, context):
         print("UpdateCategory request received")
 
+        name = request.name.strip()
+
+        if not name:
+            context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                "Category name is required",
+            )
+
         db = SessionLocal()
 
         try:
@@ -156,29 +158,36 @@ class CategoryService(
             )
 
             if category is None:
-                context.abort(
-                    grpc.StatusCode.NOT_FOUND,
-                    "Category not found",
-                )
+                category_not_found = True
+            else:
+                category_not_found = False
 
-            name = request.name.strip()
+        except Exception as exc:
+            print(f"UpdateCategory query error: {exc}")
+            context.abort(
+                grpc.StatusCode.INTERNAL,
+                "Failed to retrieve category",
+            )
 
-            if not name:
-                context.abort(
-                    grpc.StatusCode.INVALID_ARGUMENT,
-                    "Category name is required",
-                )
+        if category_not_found:
+            db.close()
+            context.abort(
+                grpc.StatusCode.NOT_FOUND,
+                "Category not found",
+            )
 
+        try:
             category.name = name
 
             db.commit()
             db.refresh(category)
 
-            return self.make_category_response(category)
+            response = self.make_category_response(category)
+
+            return response
 
         except IntegrityError:
             db.rollback()
-
             context.abort(
                 grpc.StatusCode.ALREADY_EXISTS,
                 "Category name already exists",
@@ -186,10 +195,6 @@ class CategoryService(
 
         except Exception as exc:
             db.rollback()
-
-            if isinstance(exc, grpc.RpcError):
-                raise
-
             print(f"UpdateCategory error: {exc}")
 
             context.abort(
@@ -213,24 +218,41 @@ class CategoryService(
             )
 
             if category is None:
-                context.abort(
-                    grpc.StatusCode.NOT_FOUND,
-                    "Category not found",
-                )
+                category_not_found = True
+                response = None
+            else:
+                category_not_found = False
+                response = self.make_category_response(category)
 
-            response = self.make_category_response(category)
+        except Exception as exc:
+            print(f"DeleteCategory query error: {exc}")
+            context.abort(
+                grpc.StatusCode.INTERNAL,
+                "Failed to retrieve category",
+            )
 
+        if category_not_found:
+            db.close()
+            context.abort(
+                grpc.StatusCode.NOT_FOUND,
+                "Category not found",
+            )
+
+        try:
             db.delete(category)
             db.commit()
 
             return response
 
+        except IntegrityError:
+            db.rollback()
+            context.abort(
+                grpc.StatusCode.FAILED_PRECONDITION,
+                "Category cannot be deleted because it is in use",
+            )
+
         except Exception as exc:
             db.rollback()
-
-            if isinstance(exc, grpc.RpcError):
-                raise
-
             print(f"DeleteCategory error: {exc}")
 
             context.abort(
