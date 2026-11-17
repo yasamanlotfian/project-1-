@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 import grpc
 import jwt
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from passlib.context import CryptContext
 from dotenv import load_dotenv
 
@@ -221,6 +222,20 @@ class UserService(user_pb2_grpc.UserServiceServicer):
         except grpc.RpcError:
             raise
 
+        except IntegrityError:
+            db.rollback()
+            context.abort(
+                grpc.StatusCode.ALREADY_EXISTS,
+                "Username or email already exists"
+            )
+
+        except SQLAlchemyError:
+            db.rollback()
+            context.abort(
+                grpc.StatusCode.INTERNAL,
+                "Database error while creating user"
+            )
+
         finally:
             db.close()
 
@@ -294,6 +309,23 @@ class UserService(user_pb2_grpc.UserServiceServicer):
                 role=user.role
             )
 
+        except grpc.RpcError:
+            raise
+
+        except IntegrityError:
+            db.rollback()
+            context.abort(
+                grpc.StatusCode.ALREADY_EXISTS,
+                "Username or email already exists"
+            )
+
+        except SQLAlchemyError:
+            db.rollback()
+            context.abort(
+                grpc.StatusCode.INTERNAL,
+                "Database error while updating user"
+            )
+
         finally:
             db.close()
 
@@ -308,17 +340,33 @@ class UserService(user_pb2_grpc.UserServiceServicer):
             )
 
             if not user:
-                return user_pb2.DeleteResponse(
-                    success=False,
-                    message="User not found"
+                context.abort(
+                    grpc.StatusCode.NOT_FOUND,
+                    "User not found"
                 )
 
             db.delete(user)
             db.commit()
 
             return user_pb2.DeleteResponse(
-                success=True,
                 message="User deleted successfully"
+            )
+
+        except grpc.RpcError:
+            raise
+
+        except IntegrityError:
+            db.rollback()
+            context.abort(
+                grpc.StatusCode.FAILED_PRECONDITION,
+                "Cannot delete user because related records exist"
+            )
+
+        except SQLAlchemyError:
+            db.rollback()
+            context.abort(
+                grpc.StatusCode.INTERNAL,
+                "Database error while deleting user"
             )
 
         finally:
