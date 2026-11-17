@@ -39,14 +39,20 @@ class TagService(
         db = SessionLocal()
 
         try:
-            tags = db.query(Tag).order_by(Tag.id).all()
+            tags = (
+                db.query(Tag)
+                .order_by(Tag.id)
+                .all()
+            )
 
-            return tag_pb2.TagList(
+            response = tag_pb2.TagList(
                 tags=[
                     self.make_tag_response(tag)
                     for tag in tags
                 ]
             )
+
+            return response
 
         except Exception as exc:
             print(f"GetTags error: {exc}")
@@ -65,23 +71,14 @@ class TagService(
         db = SessionLocal()
 
         try:
-            tag = db.query(Tag).filter(
-                Tag.id == request.tag_id
-            ).first()
-
-            if tag is None:
-                context.abort(
-                    grpc.StatusCode.NOT_FOUND,
-                    "Tag not found",
-                )
-
-            return self.make_tag_response(tag)
+            tag = (
+                db.query(Tag)
+                .filter(Tag.id == request.tag_id)
+                .first()
+            )
 
         except Exception as exc:
-            if isinstance(exc, grpc.RpcError):
-                raise
-
-            print(f"GetTag error: {exc}")
+            print(f"GetTag database error: {exc}")
 
             context.abort(
                 grpc.StatusCode.INTERNAL,
@@ -91,30 +88,41 @@ class TagService(
         finally:
             db.close()
 
+        if tag is None:
+            context.abort(
+                grpc.StatusCode.NOT_FOUND,
+                "Tag not found",
+            )
+
+        return self.make_tag_response(tag)
+
     def CreateTag(self, request, context):
         print("CreateTag request received")
+
+        name = request.name.strip()
+
+        if not name:
+            context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                "Tag name is required",
+            )
 
         db = SessionLocal()
 
         try:
-            name = request.name.strip()
-
-            if not name:
-                context.abort(
-                    grpc.StatusCode.INVALID_ARGUMENT,
-                    "Tag name is required",
-                )
-
             tag = Tag(name=name)
 
             db.add(tag)
             db.commit()
             db.refresh(tag)
 
-            return self.make_tag_response(tag)
+            response = self.make_tag_response(tag)
 
-        except IntegrityError:
+            return response
+
+        except IntegrityError as exc:
             db.rollback()
+            print(f"CreateTag integrity error: {exc}")
 
             context.abort(
                 grpc.StatusCode.ALREADY_EXISTS,
@@ -123,10 +131,6 @@ class TagService(
 
         except Exception as exc:
             db.rollback()
-
-            if isinstance(exc, grpc.RpcError):
-                raise
-
             print(f"CreateTag error: {exc}")
 
             context.abort(
@@ -140,36 +144,52 @@ class TagService(
     def UpdateTag(self, request, context):
         print("UpdateTag request received")
 
+        name = request.name.strip()
+
+        if not name:
+            context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                "Tag name is required",
+            )
+
         db = SessionLocal()
 
         try:
-            tag = db.query(Tag).filter(
-                Tag.id == request.tag_id
-            ).first()
+            tag = (
+                db.query(Tag)
+                .filter(Tag.id == request.tag_id)
+                .first()
+            )
 
-            if tag is None:
-                context.abort(
-                    grpc.StatusCode.NOT_FOUND,
-                    "Tag not found",
-                )
+        except Exception as exc:
+            print(f"UpdateTag query error: {exc}")
 
-            name = request.name.strip()
+            context.abort(
+                grpc.StatusCode.INTERNAL,
+                "Failed to retrieve tag",
+            )
 
-            if not name:
-                context.abort(
-                    grpc.StatusCode.INVALID_ARGUMENT,
-                    "Tag name is required",
-                )
+        if tag is None:
+            db.close()
 
+            context.abort(
+                grpc.StatusCode.NOT_FOUND,
+                "Tag not found",
+            )
+
+        try:
             tag.name = name
 
             db.commit()
             db.refresh(tag)
 
-            return self.make_tag_response(tag)
+            response = self.make_tag_response(tag)
 
-        except IntegrityError:
+            return response
+
+        except IntegrityError as exc:
             db.rollback()
+            print(f"UpdateTag integrity error: {exc}")
 
             context.abort(
                 grpc.StatusCode.ALREADY_EXISTS,
@@ -178,10 +198,6 @@ class TagService(
 
         except Exception as exc:
             db.rollback()
-
-            if isinstance(exc, grpc.RpcError):
-                raise
-
             print(f"UpdateTag error: {exc}")
 
             context.abort(
@@ -198,16 +214,29 @@ class TagService(
         db = SessionLocal()
 
         try:
-            tag = db.query(Tag).filter(
-                Tag.id == request.tag_id
-            ).first()
+            tag = (
+                db.query(Tag)
+                .filter(Tag.id == request.tag_id)
+                .first()
+            )
 
-            if tag is None:
-                context.abort(
-                    grpc.StatusCode.NOT_FOUND,
-                    "Tag not found",
-                )
+        except Exception as exc:
+            print(f"DeleteTag query error: {exc}")
 
+            context.abort(
+                grpc.StatusCode.INTERNAL,
+                "Failed to retrieve tag",
+            )
+
+        if tag is None:
+            db.close()
+
+            context.abort(
+                grpc.StatusCode.NOT_FOUND,
+                "Tag not found",
+            )
+
+        try:
             response = self.make_tag_response(tag)
 
             db.delete(tag)
@@ -215,12 +244,17 @@ class TagService(
 
             return response
 
+        except IntegrityError as exc:
+            db.rollback()
+            print(f"DeleteTag integrity error: {exc}")
+
+            context.abort(
+                grpc.StatusCode.FAILED_PRECONDITION,
+                "Tag cannot be deleted because it is in use",
+            )
+
         except Exception as exc:
             db.rollback()
-
-            if isinstance(exc, grpc.RpcError):
-                raise
-
             print(f"DeleteTag error: {exc}")
 
             context.abort(
