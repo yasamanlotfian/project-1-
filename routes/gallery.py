@@ -37,7 +37,6 @@ def create_gallery(
     new_gallery = Gallery(
         title=gallery_data.title,
         file_id=gallery_data.file_id,
-        alt_text=gallery_data.alt_text,
     )
 
     db.add(new_gallery)
@@ -50,7 +49,6 @@ def create_gallery(
         "original_file_url": file.original_file_url,
         "optimized_file_url": file.optimized_file_url,
         "crop_file_url": file.crop_file_url,
-        "alt_text": new_gallery.alt_text,
     }
 
 
@@ -71,7 +69,6 @@ def get_galleries(
             "original_file_url": file.original_file_url,
             "optimized_file_url": file.optimized_file_url,
             "crop_file_url": file.crop_file_url,
-            "alt_text": gallery.alt_text,
         }
         for gallery, file in galleries
     ]
@@ -103,7 +100,6 @@ def get_gallery(
         "original_file_url": file.original_file_url,
         "optimized_file_url": file.optimized_file_url,
         "crop_file_url": file.crop_file_url,
-        "alt_text": gallery.alt_text,
     }
 
 
