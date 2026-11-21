@@ -9,14 +9,13 @@ sys.path.insert(0, str(GRPC_GALLERY_DIR))
 sys.path.insert(0, str(PROJECT_ROOT))
 
 import grpc
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.openapi.utils import get_openapi
 from pydantic import BaseModel
 from google.protobuf.json_format import MessageToDict
 from grpc import RpcError
 from scalar_fastapi import get_scalar_api_reference
-
-from service.file_service import FileServiceClient
 
 import gallery_pb2
 import gallery_pb2_grpc
@@ -62,20 +61,24 @@ def custom_openapi():
 app.openapi = custom_openapi
 
 
-channel = grpc.insecure_channel("localhost:5052")
-stub = gallery_pb2_grpc.GalleryServiceStub(channel)
 
-file_client = FileServiceClient(address="localhost:5055")
+channel = grpc.insecure_channel("localhost:5052")
+
+stub = gallery_pb2_grpc.GalleryServiceStub(channel)
 
 
 class CreateGalleryRequest(BaseModel):
+
     title: str
     file_id: int
 
 
 class UpdateGalleryRequest(BaseModel):
+
     title: str | None = None
     file_id: int | None = None
+
+
 
 
 def get_grpc_metadata(request: Request):
@@ -115,7 +118,6 @@ def handle_grpc_error(exc: RpcError):
         grpc.StatusCode.INVALID_ARGUMENT: 400,
         grpc.StatusCode.ALREADY_EXISTS: 409,
         grpc.StatusCode.FAILED_PRECONDITION: 409,
-        grpc.StatusCode.RESOURCE_EXHAUSTED: 429,
         grpc.StatusCode.UNAVAILABLE: 503,
         grpc.StatusCode.DEADLINE_EXCEEDED: 504,
         grpc.StatusCode.INTERNAL: 500,
@@ -130,6 +132,7 @@ def handle_grpc_error(exc: RpcError):
     )
 
 
+
 def message_to_dict(message):
 
     return MessageToDict(
@@ -137,56 +140,6 @@ def message_to_dict(message):
         preserving_proto_field_name=True,
     )
 
-
-def add_file_urls(gallery_data: dict):
-
-    file_id = gallery_data.get("file_id")
-
-    if file_id is None:
-        return gallery_data
-
-    try:
-        file_data = file_client.get_file(int(file_id))
-
-        gallery_data["original_file_url"] = getattr(
-            file_data, "original_file_url", ""
-        )
-
-        gallery_data["optimized_file_url"] = getattr(
-            file_data, "optimized_file_url", ""
-        )
-
-        gallery_data["crop_file_url"] = getattr(
-            file_data, "crop_file_url", ""
-        )
-
-        return gallery_data
-
-    except RpcError as exc:
-        handle_grpc_error(exc)
-
-
-def validate_title(title):
-
-    if title is not None and not title.strip():
-        raise HTTPException(
-            status_code=422,
-            detail="Title cannot be empty",
-        )
-
-
-def get_gallery_or_404(gallery_id, metadata):
-
-    try:
-        return stub.GetGallery(
-            gallery_pb2.GalleryRequest(
-                gallery_id=gallery_id,
-            ),
-            metadata=metadata,
-        )
-
-    except RpcError as exc:
-        handle_grpc_error(exc)
 
 
 @app.get("/scalar", include_in_schema=False)
@@ -196,6 +149,7 @@ def scalar_docs():
         openapi_url=app.openapi_url,
         title=app.title,
     )
+
 
 
 @app.get("/galleries/")
@@ -209,18 +163,12 @@ def get_galleries(request: Request):
             metadata=metadata,
         )
 
-        result = message_to_dict(response)
-
-        if "galleries" in result:
-            result["galleries"] = [
-                add_file_urls(gallery)
-                for gallery in result["galleries"]
-            ]
-
-        return result
+        return message_to_dict(response)
 
     except RpcError as exc:
         handle_grpc_error(exc)
+
+
 
 
 @app.get("/galleries/{gallery_id}")
@@ -232,19 +180,21 @@ def get_gallery(
     metadata = get_grpc_metadata(request)
 
     try:
+        grpc_request = gallery_pb2.GalleryRequest(
+            gallery_id=gallery_id,
+        )
+
         response = stub.GetGallery(
-            gallery_pb2.GalleryRequest(
-                gallery_id=gallery_id,
-            ),
+            grpc_request,
             metadata=metadata,
         )
 
-        result = message_to_dict(response)
-
-        return add_file_urls(result)
+        return message_to_dict(response)
 
     except RpcError as exc:
         handle_grpc_error(exc)
+
+
 
 
 @app.post("/galleries/", status_code=201)
@@ -255,25 +205,28 @@ def create_gallery(
 
     metadata = get_grpc_metadata(request)
 
-    validate_title(data.title)
+    if not data.title.strip():
+        raise HTTPException(
+            status_code=422,
+            detail="Title cannot be empty",
+        )
 
     try:
-        file_client.get_file(data.file_id)
+        grpc_request = gallery_pb2.CreateGalleryRequest(
+            title=data.title.strip(),
+            file_id=data.file_id,
+        )
 
         response = stub.CreateGallery(
-            gallery_pb2.CreateGalleryRequest(
-                title=data.title.strip(),
-                file_id=data.file_id,
-            ),
+            grpc_request,
             metadata=metadata,
         )
 
-        result = message_to_dict(response)
-
-        return add_file_urls(result)
+        return message_to_dict(response)
 
     except RpcError as exc:
         handle_grpc_error(exc)
+
 
 
 @app.patch("/galleries/{gallery_id}")
@@ -318,13 +271,18 @@ def update_gallery(
 
     try:
 
-        # Check that gallery exists
-        current_response = get_gallery_or_404(
-            gallery_id,
-            metadata,
+      
+
+        current_response = stub.GetGallery(
+            gallery_pb2.GalleryRequest(
+                gallery_id=gallery_id,
+            ),
+            metadata=metadata,
         )
 
         current = message_to_dict(current_response)
+
+    
 
         title = (
             data.title
@@ -338,7 +296,13 @@ def update_gallery(
             else current.get("file_id", 0)
         )
 
-        validate_title(title)
+   
+
+        if not title or not title.strip():
+            raise HTTPException(
+                status_code=422,
+                detail="Title cannot be empty",
+            )
 
         if not file_id:
             raise HTTPException(
@@ -346,28 +310,27 @@ def update_gallery(
                 detail="file_id is required",
             )
 
-        # Validate File Service
-        file_client.get_file(int(file_id))
+        # gRPC Request
 
-        # Update Gallery
+        grpc_request = gallery_pb2.UpdateGalleryRequest(
+            gallery_id=gallery_id,
+            title=title.strip(),
+            file_id=file_id,
+        )
+
         response = stub.UpdateGallery(
-            gallery_pb2.UpdateGalleryRequest(
-                gallery_id=gallery_id,
-                title=title.strip(),
-                file_id=int(file_id),
-            ),
+            grpc_request,
             metadata=metadata,
         )
 
-        result = message_to_dict(response)
-
-        return add_file_urls(result)
+        return message_to_dict(response)
 
     except HTTPException:
         raise
 
     except RpcError as exc:
         handle_grpc_error(exc)
+
 
 
 @app.delete("/galleries/{gallery_id}")
@@ -379,10 +342,12 @@ def delete_gallery(
     metadata = get_grpc_metadata(request)
 
     try:
+        grpc_request = gallery_pb2.DeleteGalleryRequest(
+            gallery_id=gallery_id,
+        )
+
         response = stub.DeleteGallery(
-            gallery_pb2.DeleteGalleryRequest(
-                gallery_id=gallery_id,
-            ),
+            grpc_request,
             metadata=metadata,
         )
 
