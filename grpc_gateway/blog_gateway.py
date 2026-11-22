@@ -12,7 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 import grpc
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.openapi.utils import get_openapi
 from pydantic import BaseModel, Field
 from google.protobuf.json_format import MessageToDict
@@ -44,16 +44,6 @@ def custom_openapi():
         routes=app.routes,
     )
 
-    schema.setdefault("components", {}).setdefault(
-        "securitySchemes", {}
-    )["BearerAuth"] = {
-        "type": "http",
-        "scheme": "bearer",
-        "bearerFormat": "JWT",
-    }
-
-    schema["security"] = [{"BearerAuth": []}]
-
     app.openapi_schema = schema
     return app.openapi_schema
 
@@ -84,22 +74,10 @@ class UpdateBlogRequest(BaseModel):
     file_id: int | None = None
 
 
-def get_grpc_metadata(request: Request):
-    authorization = request.headers.get("Authorization")
-
-    if not authorization:
-        raise HTTPException(
-            status_code=401,
-            detail="Authorization header is missing"
-        )
-
-    if not authorization.lower().startswith("bearer "):
-        raise HTTPException(
-            status_code=401,
-            detail="Authorization must use Bearer token"
-        )
-
-    return (("authorization", authorization),)
+def get_grpc_metadata(x_user_name: str):
+    return (
+        ("x-user-name", x_user_name),
+    )
 
 
 def handle_grpc_error(exc: RpcError):
@@ -141,10 +119,7 @@ def convert_blog_response(response):
 
     result.setdefault("view_num", 0)
     result.setdefault("path_photo", "")
-
-  
     result.setdefault("category", None)
-
     result.setdefault("tags", [])
 
     return result
@@ -159,8 +134,10 @@ def scalar_docs():
 
 
 @app.get("/blogs/")
-def get_blogs(request: Request):
-    metadata = get_grpc_metadata(request)
+def get_blogs(
+    x_user_name: str = Header(..., alias="X-User-Name")
+):
+    metadata = get_grpc_metadata(x_user_name)
 
     try:
         response = stub.GetBlogs(
@@ -181,8 +158,11 @@ def get_blogs(request: Request):
 
 
 @app.get("/blogs/{blog_id}")
-def get_blog(blog_id: int, request: Request):
-    metadata = get_grpc_metadata(request)
+def get_blog(
+    blog_id: int,
+    x_user_name: str = Header(..., alias="X-User-Name")
+):
+    metadata = get_grpc_metadata(x_user_name)
 
     try:
         response = stub.GetBlog(
@@ -198,8 +178,11 @@ def get_blog(blog_id: int, request: Request):
 
 
 @app.post("/blogs/", status_code=201)
-def create_blog(data: CreateBlogRequest, request: Request):
-    metadata = get_grpc_metadata(request)
+def create_blog(
+    data: CreateBlogRequest,
+    x_user_name: str = Header(..., alias="X-User-Name")
+):
+    metadata = get_grpc_metadata(x_user_name)
 
     try:
         grpc_request = blog_pb2.CreateBlogRequest(
@@ -211,7 +194,6 @@ def create_blog(data: CreateBlogRequest, request: Request):
             file_id=data.file_id or 0,
             category_id=data.category_id,
             tag_ids=data.tag_ids
-
         )
 
         response = stub.CreateBlog(
@@ -230,9 +212,9 @@ def create_blog(data: CreateBlogRequest, request: Request):
 def update_blog(
     blog_id: int,
     data: UpdateBlogRequest,
-    request: Request
+    x_user_name: str = Header(..., alias="X-User-Name")
 ):
-    metadata = get_grpc_metadata(request)
+    metadata = get_grpc_metadata(x_user_name)
 
     try:
         grpc_request = blog_pb2.UpdateBlogRequest(
@@ -257,8 +239,11 @@ def update_blog(
 
 
 @app.delete("/blogs/{blog_id}")
-def delete_blog(blog_id: int, request: Request):
-    metadata = get_grpc_metadata(request)
+def delete_blog(
+    blog_id: int,
+    x_user_name: str = Header(..., alias="X-User-Name")
+):
+    metadata = get_grpc_metadata(x_user_name)
 
     try:
         response = stub.DeleteBlog(
