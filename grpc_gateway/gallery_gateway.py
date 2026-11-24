@@ -5,13 +5,18 @@ import sys
 PROJECT_ROOT = Path(r"C:\Users\lotus\project")
 GRPC_GALLERY_DIR = PROJECT_ROOT / "grpc" / "gallery"
 
-sys.path.insert(0, str(GRPC_GALLERY_DIR))
-sys.path.insert(0, str(PROJECT_ROOT))
+if str(GRPC_GALLERY_DIR) not in sys.path:
+    sys.path.insert(0, str(GRPC_GALLERY_DIR))
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 import grpc
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.openapi.utils import get_openapi
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from google.protobuf.json_format import MessageToDict
 from grpc import RpcError
@@ -61,7 +66,6 @@ def custom_openapi():
 app.openapi = custom_openapi
 
 
-
 channel = grpc.insecure_channel("localhost:5052")
 
 stub = gallery_pb2_grpc.GalleryServiceStub(channel)
@@ -79,6 +83,27 @@ class UpdateGalleryRequest(BaseModel):
     file_id: int | None = None
 
 
+# 422 Validation Error Handler
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(request: Request, exc: RequestValidationError):
+
+    errors = []
+
+    for error in exc.errors():
+        field = ".".join(str(item) for item in error["loc"])
+        message = str(error["msg"])
+        error_type = str(error["type"])
+
+        errors.append({
+            "field": field,
+            "message": message,
+            "type": error_type,
+        })
+
+    return JSONResponse(
+        status_code=422,
+        content={"detail": errors},
+    )
 
 
 def get_grpc_metadata(request: Request):
@@ -95,14 +120,20 @@ def get_grpc_metadata(request: Request):
 
     parts = authorization.split(None, 1)
 
-    if len(parts) != 2 or parts[0].lower() != "bearer":
+    if (
+        len(parts) != 2
+        or parts[0].lower() != "bearer"
+        or not parts[1].strip()
+    ):
         raise HTTPException(
             status_code=401,
             detail="Expected Authorization: Bearer <token>",
         )
 
+    token = parts[1].strip()
+
     return (
-        ("authorization", f"Bearer {parts[1]}"),
+        ("authorization", f"Bearer {token}"),
     )
 
 
@@ -132,14 +163,12 @@ def handle_grpc_error(exc: RpcError):
     )
 
 
-
 def message_to_dict(message):
 
     return MessageToDict(
         message,
         preserving_proto_field_name=True,
     )
-
 
 
 @app.get("/scalar", include_in_schema=False)
@@ -151,7 +180,6 @@ def scalar_docs():
     )
 
 
-
 @app.get("/galleries/")
 def get_galleries(request: Request):
 
@@ -161,14 +189,13 @@ def get_galleries(request: Request):
         response = stub.GetGalleries(
             gallery_pb2.Empty(),
             metadata=metadata,
+            timeout=30,
         )
 
         return message_to_dict(response)
 
     except RpcError as exc:
         handle_grpc_error(exc)
-
-
 
 
 @app.get("/galleries/{gallery_id}")
@@ -179,6 +206,12 @@ def get_gallery(
 
     metadata = get_grpc_metadata(request)
 
+    if gallery_id <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="gallery_id must be greater than zero",
+        )
+
     try:
         grpc_request = gallery_pb2.GalleryRequest(
             gallery_id=gallery_id,
@@ -187,14 +220,13 @@ def get_gallery(
         response = stub.GetGallery(
             grpc_request,
             metadata=metadata,
+            timeout=30,
         )
 
         return message_to_dict(response)
 
     except RpcError as exc:
         handle_grpc_error(exc)
-
-
 
 
 @app.post("/galleries/", status_code=201)
@@ -211,6 +243,12 @@ def create_gallery(
             detail="Title cannot be empty",
         )
 
+    if data.file_id <= 0:
+        raise HTTPException(
+            status_code=422,
+            detail="file_id must be greater than zero",
+        )
+
     try:
         grpc_request = gallery_pb2.CreateGalleryRequest(
             title=data.title.strip(),
@@ -220,13 +258,13 @@ def create_gallery(
         response = stub.CreateGallery(
             grpc_request,
             metadata=metadata,
+            timeout=30,
         )
 
         return message_to_dict(response)
 
     except RpcError as exc:
         handle_grpc_error(exc)
-
 
 
 @app.patch("/galleries/{gallery_id}")
@@ -237,6 +275,12 @@ def update_gallery(
 ):
 
     metadata = get_grpc_metadata(request)
+
+    if gallery_id <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="gallery_id must be greater than zero",
+        )
 
     fields_set = getattr(
         data,
@@ -269,20 +313,23 @@ def update_gallery(
             detail="file_id cannot be null",
         )
 
-    try:
+    if "file_id" in fields_set and data.file_id <= 0:
+        raise HTTPException(
+            status_code=422,
+            detail="file_id must be greater than zero",
+        )
 
-      
+    try:
 
         current_response = stub.GetGallery(
             gallery_pb2.GalleryRequest(
                 gallery_id=gallery_id,
             ),
             metadata=metadata,
+            timeout=30,
         )
 
         current = message_to_dict(current_response)
-
-    
 
         title = (
             data.title
@@ -296,21 +343,17 @@ def update_gallery(
             else current.get("file_id", 0)
         )
 
-   
-
         if not title or not title.strip():
             raise HTTPException(
                 status_code=422,
                 detail="Title cannot be empty",
             )
 
-        if not file_id:
+        if not file_id or file_id <= 0:
             raise HTTPException(
                 status_code=422,
-                detail="file_id is required",
+                detail="file_id is required and must be greater than zero",
             )
-
-        # gRPC Request
 
         grpc_request = gallery_pb2.UpdateGalleryRequest(
             gallery_id=gallery_id,
@@ -321,6 +364,7 @@ def update_gallery(
         response = stub.UpdateGallery(
             grpc_request,
             metadata=metadata,
+            timeout=30,
         )
 
         return message_to_dict(response)
@@ -332,7 +376,6 @@ def update_gallery(
         handle_grpc_error(exc)
 
 
-
 @app.delete("/galleries/{gallery_id}")
 def delete_gallery(
     gallery_id: int,
@@ -340,6 +383,12 @@ def delete_gallery(
 ):
 
     metadata = get_grpc_metadata(request)
+
+    if gallery_id <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="gallery_id must be greater than zero",
+        )
 
     try:
         grpc_request = gallery_pb2.DeleteGalleryRequest(
@@ -349,6 +398,7 @@ def delete_gallery(
         response = stub.DeleteGallery(
             grpc_request,
             metadata=metadata,
+            timeout=10,
         )
 
         return message_to_dict(response)
