@@ -74,9 +74,9 @@ class UpdateBlogRequest(BaseModel):
     file_id: int | None = None
 
 
-def get_grpc_metadata(x_user_name: str):
+def get_grpc_metadata(language: str):
     return (
-        ("x-user-name", x_user_name),
+        ("language", language),
     )
 
 
@@ -135,9 +135,9 @@ def scalar_docs():
 
 @app.get("/blogs/")
 def get_blogs(
-    x_user_name: str = Header(..., alias="X-User-Name")
+    language: str = Header(..., alias="Language")
 ):
-    metadata = get_grpc_metadata(x_user_name)
+    metadata = get_grpc_metadata(language)
 
     try:
         response = stub.GetBlogs(
@@ -160,9 +160,9 @@ def get_blogs(
 @app.get("/blogs/{blog_id}")
 def get_blog(
     blog_id: int,
-    x_user_name: str = Header(..., alias="X-User-Name")
+    language: str = Header(..., alias="Language")
 ):
-    metadata = get_grpc_metadata(x_user_name)
+    metadata = get_grpc_metadata(language)
 
     try:
         response = stub.GetBlog(
@@ -180,9 +180,9 @@ def get_blog(
 @app.post("/blogs/", status_code=201)
 def create_blog(
     data: CreateBlogRequest,
-    x_user_name: str = Header(..., alias="X-User-Name")
+    language: str = Header(..., alias="Language")
 ):
-    metadata = get_grpc_metadata(x_user_name)
+    metadata = get_grpc_metadata(language)
 
     try:
         grpc_request = blog_pb2.CreateBlogRequest(
@@ -212,9 +212,9 @@ def create_blog(
 def update_blog(
     blog_id: int,
     data: UpdateBlogRequest,
-    x_user_name: str = Header(..., alias="X-User-Name")
+    language: str = Header(..., alias="Language")
 ):
-    metadata = get_grpc_metadata(x_user_name)
+    metadata = get_grpc_metadata(language)
 
     try:
         grpc_request = blog_pb2.UpdateBlogRequest(
@@ -241,9 +241,9 @@ def update_blog(
 @app.delete("/blogs/{blog_id}")
 def delete_blog(
     blog_id: int,
-    x_user_name: str = Header(..., alias="X-User-Name")
+    language: str = Header(..., alias="Language")
 ):
-    metadata = get_grpc_metadata(x_user_name)
+    metadata = get_grpc_metadata(language)
 
     try:
         response = stub.DeleteBlog(
