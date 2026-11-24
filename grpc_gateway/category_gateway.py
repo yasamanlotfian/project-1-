@@ -14,6 +14,8 @@ if str(PROJECT_ROOT) not in sys.path:
 import grpc
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.openapi.utils import get_openapi
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator
 from google.protobuf.json_format import MessageToDict
 from grpc import RpcError
@@ -94,8 +96,30 @@ class UpdateCategoryRequest(BaseModel):
         return value
 
 
+# 422 Validation Error Handler
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(request: Request, exc: RequestValidationError):
+    errors = []
+
+    for error in exc.errors():
+        field = ".".join(str(item) for item in error["loc"])
+        message = str(error["msg"])
+        error_type = str(error["type"])
+
+        errors.append({
+            "field": field,
+            "message": message,
+            "type": error_type,
+        })
+
+    return JSONResponse(
+        status_code=422,
+        content={"detail": errors},
+    )
+
+
 def get_grpc_metadata(request: Request):
-    authorization = request.headers.get("Authorization")
+    authorization = request.headers.get("Authorization", "").strip()
 
     if not authorization:
         raise HTTPException(
@@ -103,13 +127,21 @@ def get_grpc_metadata(request: Request):
             detail="Authorization header is missing",
         )
 
-    if not authorization.lower().startswith("bearer "):
+    parts = authorization.split(None, 1)
+
+    if (
+        len(parts) != 2
+        or parts[0].lower() != "bearer"
+        or not parts[1].strip()
+    ):
         raise HTTPException(
             status_code=401,
             detail="Authorization must use Bearer token",
         )
 
-    return (("authorization", authorization),)
+    token = parts[1].strip()
+
+    return (("authorization", f"Bearer {token}"),)
 
 
 def handle_grpc_error(exc: RpcError):
