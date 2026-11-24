@@ -1,4 +1,3 @@
-
 import sys
 import re
 from concurrent import futures
@@ -26,6 +25,19 @@ import blog_pb2_grpc
 
 
 class BlogService(blog_pb2_grpc.BlogServiceServicer):
+
+    def get_language(self, context):
+        metadata = dict(context.invocation_metadata())
+        language = metadata.get("language", "fa")
+        language = language.strip().lower()
+
+        if language not in ("fa", "en"):
+            context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                "Unsupported language. Use 'fa' or 'en'."
+            )
+
+        return language
 
     def slugify(self, text):
         text = (text or "").lower().strip()
@@ -106,12 +118,10 @@ class BlogService(blog_pb2_grpc.BlogServiceServicer):
 
     def add_category_and_tags(self, blog_response, blog):
 
-        # افزودن دسته‌بندی
         if blog.category:
             blog_response.category.id = blog.category.id
             blog_response.category.name = blog.category.name
 
-        # افزودن تگ‌ها
         for tag in blog.tags:
             tag_response = blog_response.tags.add()
             tag_response.id = tag.id
@@ -121,6 +131,10 @@ class BlogService(blog_pb2_grpc.BlogServiceServicer):
 
     def GetBlogs(self, request, context):
         print("GetBlogs request received by gRPC server")
+
+        language = self.get_language(context)
+        print(f"Selected language: {language}")
+
         db: Session = SessionLocal()
 
         try:
@@ -130,6 +144,7 @@ class BlogService(blog_pb2_grpc.BlogServiceServicer):
                     selectinload(Blog.category),
                     selectinload(Blog.tags),
                 )
+                .filter(Blog.language == language)
                 .all()
             )
 
@@ -177,6 +192,10 @@ class BlogService(blog_pb2_grpc.BlogServiceServicer):
 
     def GetBlog(self, request, context):
         print("GetBlog request received by gRPC server")
+
+        language = self.get_language(context)
+        print(f"Selected language: {language}")
+
         db: Session = SessionLocal()
 
         try:
@@ -186,7 +205,10 @@ class BlogService(blog_pb2_grpc.BlogServiceServicer):
                     selectinload(Blog.category),
                     selectinload(Blog.tags),
                 )
-                .filter(Blog.id == request.blog_id)
+                .filter(
+                    Blog.id == request.blog_id,
+                    Blog.language == language
+                )
                 .first()
             )
 
@@ -224,6 +246,9 @@ class BlogService(blog_pb2_grpc.BlogServiceServicer):
     def CreateBlog(self, request, context):
         print("CreateBlog request received by gRPC server")
 
+        language = self.get_language(context)
+        print(f"Selected language: {language}")
+
         if request.file_id:
             self.validate_file(request.file_id, context)
 
@@ -237,7 +262,6 @@ class BlogService(blog_pb2_grpc.BlogServiceServicer):
                 input_slug
             )
 
-            # دریافت دسته‌بندی
             category = db.query(Category).filter(
                 Category.id == request.category_id
             ).first()
@@ -248,7 +272,6 @@ class BlogService(blog_pb2_grpc.BlogServiceServicer):
                     "Category not found"
                 )
 
-            # دریافت تگ‌ها
             tag_ids = list(request.tag_ids)
 
             tags = (
@@ -264,7 +287,6 @@ class BlogService(blog_pb2_grpc.BlogServiceServicer):
                     "One or more tags not found"
                 )
 
-            # ایجاد بلاگ همراه دسته‌بندی و تگ‌ها
             blog = Blog(
                 title=request.title,
                 slug=unique_slug,
@@ -273,21 +295,24 @@ class BlogService(blog_pb2_grpc.BlogServiceServicer):
                 user_id=request.user_id,
                 file_id=request.file_id or None,
                 category=category,
-                tags=tags
+                tags=tags,
+                language=language
             )
 
             db.add(blog)
             db.commit()
             db.refresh(blog)
 
-            # بارگذاری مجدد رابطه‌ها
             blog = (
                 db.query(Blog)
                 .options(
                     selectinload(Blog.category),
                     selectinload(Blog.tags),
                 )
-                .filter(Blog.id == blog.id)
+                .filter(
+                    Blog.id == blog.id,
+                    Blog.language == language
+                )
                 .first()
             )
 
@@ -326,6 +351,9 @@ class BlogService(blog_pb2_grpc.BlogServiceServicer):
     def UpdateBlog(self, request, context):
         print("UpdateBlog request received by gRPC server")
 
+        language = self.get_language(context)
+        print(f"Selected language: {language}")
+
         if request.file_id:
             self.validate_file(request.file_id, context)
 
@@ -333,7 +361,8 @@ class BlogService(blog_pb2_grpc.BlogServiceServicer):
 
         try:
             blog = db.query(Blog).filter(
-                Blog.id == request.blog_id
+                Blog.id == request.blog_id,
+                Blog.language == language
             ).first()
 
             if not blog:
@@ -364,7 +393,10 @@ class BlogService(blog_pb2_grpc.BlogServiceServicer):
                     selectinload(Blog.category),
                     selectinload(Blog.tags),
                 )
-                .filter(Blog.id == request.blog_id)
+                .filter(
+                    Blog.id == request.blog_id,
+                    Blog.language == language
+                )
                 .first()
             )
 
@@ -402,6 +434,10 @@ class BlogService(blog_pb2_grpc.BlogServiceServicer):
 
     def DeleteBlog(self, request, context):
         print("DeleteBlog request received by gRPC server")
+
+        language = self.get_language(context)
+        print(f"Selected language: {language}")
+
         db: Session = SessionLocal()
 
         try:
@@ -411,7 +447,10 @@ class BlogService(blog_pb2_grpc.BlogServiceServicer):
                     selectinload(Blog.category),
                     selectinload(Blog.tags),
                 )
-                .filter(Blog.id == request.blog_id)
+                .filter(
+                    Blog.id == request.blog_id,
+                    Blog.language == language
+                )
                 .first()
             )
 
