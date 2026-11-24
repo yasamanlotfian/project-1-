@@ -83,7 +83,7 @@ class Blog(Base):
 
     language = Column(
     String(2),
-    nullable=False,
+    nullable=True,
     index=True,
 )
 
