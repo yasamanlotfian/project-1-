@@ -81,6 +81,12 @@ class Blog(Base):
         index=True,
     )
 
+    language = Column(
+    String(2),
+    nullable=False,
+    index=True,
+)
+
     updated_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
