@@ -115,10 +115,18 @@ to help maintain moisture.
                 if not existing_blog:
                     db.add(english_blog)
 
-            blogs = db.query(Blog).order_by(Blog.id).limit(4).all()
+            blogs = (
+                db.query(Blog)
+                .filter(Blog.language == "fa")
+                .order_by(Blog.id)
+                .limit(4)
+                .all()
+            )
 
             if not blogs:
-                print("No blogs found!")
+                db.commit()
+                print("English blogs added successfully!")
+                print("No Persian blogs found!")
                 return
 
             comments_data = [
@@ -140,6 +148,7 @@ to help maintain moisture.
 
             db.commit()
 
+            print("English blogs added successfully!")
             print("Comments added successfully!")
             return
 
