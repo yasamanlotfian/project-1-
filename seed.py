@@ -28,6 +28,20 @@ def seed_data():
 
     try:
 
+        def get_or_create(model, name):
+            item = (
+                db.query(model)
+                .filter(model.name == name)
+                .first()
+            )
+
+            if not item:
+                item = model(name=name)
+                db.add(item)
+                db.flush()
+
+            return item
+
         if db.query(User).first():
 
             print("Users already exist. Adding comments...")
@@ -115,6 +129,39 @@ to help maintain moisture.
                 if not existing_blog:
                     db.add(english_blog)
 
+            db.flush()
+
+            # English Categories
+            category_en1 = get_or_create(Category, "Hair Care")
+            category_en2 = get_or_create(Category, "Nail Care")
+            category_en3 = get_or_create(Category, "Skin Care")
+
+            # English Tags
+            tag_en1 = get_or_create(Tag, "Hair")
+            tag_en2 = get_or_create(Tag, "Nails")
+            tag_en3 = get_or_create(Tag, "Skin")
+            tag_en4 = get_or_create(Tag, "Beauty Care")
+
+            # Connect English Blogs
+            english_blog_relations = [
+                ("hair-care-tips-en", category_en1, [tag_en1, tag_en4]),
+                ("nail-care-tips-en", category_en2, [tag_en2, tag_en4]),
+                ("skin-care-before-makeup-en", category_en3, [tag_en3, tag_en4]),
+                ("dry-hair-care-en", category_en1, [tag_en1, tag_en4]),
+            ]
+
+            for slug, category, tags in english_blog_relations:
+
+                blog = (
+                    db.query(Blog)
+                    .filter(Blog.slug == slug)
+                    .first()
+                )
+
+                if blog:
+                    blog.category_id = category.id
+                    blog.tags = tags
+
             blogs = (
                 db.query(Blog)
                 .filter(Blog.language == "fa")
@@ -125,7 +172,7 @@ to help maintain moisture.
 
             if not blogs:
                 db.commit()
-                print("English blogs added successfully!")
+                print("English blogs and relations added successfully!")
                 print("No Persian blogs found!")
                 return
 
@@ -149,6 +196,7 @@ to help maintain moisture.
             db.commit()
 
             print("English blogs added successfully!")
+            print("English categories and tags connected successfully!")
             print("Comments added successfully!")
             return
 
@@ -325,37 +373,57 @@ to help maintain moisture.
 
         db.flush()
 
-        category1 = Category(
-            name="مراقبت از مو",
-        )
+        # Persian Categories
+        category1 = get_or_create(Category, "مراقبت از مو")
+        category2 = get_or_create(Category, "مراقبت از ناخن")
+        category3 = get_or_create(Category, "مراقبت از پوست")
 
-        category2 = Category(
-            name="مراقبت از ناخن",
-        )
-
-        category3 = Category(
-            name="مراقبت از پوست",
-        )
-
-        db.add_all([
-            category1,
-            category2,
-            category3
-        ])
+        # English Categories
+        category_en1 = get_or_create(Category, "Hair Care")
+        category_en2 = get_or_create(Category, "Nail Care")
+        category_en3 = get_or_create(Category, "Skin Care")
 
         db.flush()
 
-        tag1 = Tag(name="مو")
-        tag2 = Tag(name="ناخن")
-        tag3 = Tag(name="پوست")
-        tag4 = Tag(name="مراقبت و زیبایی")
+        # Persian Tags
+        tag1 = get_or_create(Tag, "مو")
+        tag2 = get_or_create(Tag, "ناخن")
+        tag3 = get_or_create(Tag, "پوست")
+        tag4 = get_or_create(Tag, "مراقبت و زیبایی")
 
-        db.add_all([
-            tag1,
-            tag2,
-            tag3,
-            tag4
-        ])
+        # English Tags
+        tag_en1 = get_or_create(Tag, "Hair")
+        tag_en2 = get_or_create(Tag, "Nails")
+        tag_en3 = get_or_create(Tag, "Skin")
+        tag_en4 = get_or_create(Tag, "Beauty Care")
+
+        db.flush()
+
+        # Connect Persian Blogs
+        blog1.category_id = category1.id
+        blog1.tags = [tag1, tag4]
+
+        blog2.category_id = category2.id
+        blog2.tags = [tag2, tag4]
+
+        blog3.category_id = category3.id
+        blog3.tags = [tag3, tag4]
+
+        blog4.category_id = category1.id
+        blog4.tags = [tag1, tag4]
+
+        # Connect English Blogs
+        blog5.category_id = category_en1.id
+        blog5.tags = [tag_en1, tag_en4]
+
+        blog6.category_id = category_en2.id
+        blog6.tags = [tag_en2, tag_en4]
+
+        blog7.category_id = category_en3.id
+        blog7.tags = [tag_en3, tag_en4]
+
+        blog8.category_id = category_en1.id
+        blog8.tags = [tag_en1, tag_en4]
 
         db.flush()
 
