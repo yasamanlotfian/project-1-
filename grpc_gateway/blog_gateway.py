@@ -74,7 +74,10 @@ class UpdateBlogRequest(BaseModel):
     file_id: int | None = None
 
 
-def get_grpc_metadata(language: str):
+def get_grpc_metadata(language: str | None):
+    if language is None:
+        return ()
+
     return (
         ("language", language),
     )
@@ -135,7 +138,7 @@ def scalar_docs():
 
 @app.get("/blogs/")
 def get_blogs(
-    language: str = Header(..., alias="Language")
+    language: str | None = Header(default=None, alias="Language")
 ):
     metadata = get_grpc_metadata(language)
 
@@ -160,7 +163,7 @@ def get_blogs(
 @app.get("/blogs/{blog_id}")
 def get_blog(
     blog_id: int,
-    language: str = Header(..., alias="Language")
+    language: str | None = Header(default=None, alias="Language")
 ):
     metadata = get_grpc_metadata(language)
 
@@ -180,7 +183,7 @@ def get_blog(
 @app.post("/blogs/", status_code=201)
 def create_blog(
     data: CreateBlogRequest,
-    language: str = Header(..., alias="Language")
+    language: str | None = Header(default=None, alias="Language")
 ):
     metadata = get_grpc_metadata(language)
 
@@ -212,7 +215,7 @@ def create_blog(
 def update_blog(
     blog_id: int,
     data: UpdateBlogRequest,
-    language: str = Header(..., alias="Language")
+    language: str | None = Header(default=None, alias="Language")
 ):
     metadata = get_grpc_metadata(language)
 
@@ -241,7 +244,7 @@ def update_blog(
 @app.delete("/blogs/{blog_id}")
 def delete_blog(
     blog_id: int,
-    language: str = Header(..., alias="Language")
+    language: str | None = Header(default=None, alias="Language")
 ):
     metadata = get_grpc_metadata(language)
 
